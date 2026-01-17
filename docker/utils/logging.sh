@@ -157,9 +157,14 @@ handle_error() {
             ;;
         *)
             # Don't spam errors from steamcmd - it's noisy enough already
-            if [[ $last_command != *"eval ${STEAMCMD}"* ]]; then
+            if [ -z "${STEAMCMD:-}" ]; then
                 log_message "Error on line $line_number: $last_command" "error"
                 log_message "Exit code: $exit_code" "error"
+            else
+                if [[ $last_command != *"eval ${STEAMCMD}"* ]]; then
+                    log_message "Error on line $line_number: $last_command" "error"
+                    log_message "Exit code: $exit_code" "error"
+                fi
             fi
             ;;
     esac
