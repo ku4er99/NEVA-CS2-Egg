@@ -128,17 +128,14 @@ LOGGED_STARTUP=$(echo "${MODIFIED_STARTUP}" | \
 log_message "Starting server: ${LOGGED_STARTUP}" "info"
 
 # Start GDB debugger in background if port specified
-if [ -n "${GDB_DEBUG_PORT}" ]; then
+if [ -n "${GDB_DEBUG_PORT:-}" ]; then
     (
-        # Wait for CS2 to start and find its PID using /proc
+        CS2_PID=""
         for i in {1..30}; do
             sleep 1
-
-            # Search for CS2 process in /proc
             for pid in /proc/[0-9]*; do
                 [ -d "$pid" ] || continue
                 cmdline=$(cat "$pid/cmdline" 2>/dev/null | tr '\0' ' ')
-
                 if [[ "$cmdline" =~ game/bin/.*/cs2 ]] || [[ "$cmdline" =~ /cs2\.sh ]]; then
                     CS2_PID=$(basename "$pid")
                     break 2
@@ -146,10 +143,10 @@ if [ -n "${GDB_DEBUG_PORT}" ]; then
             done
         done
 
-        if [ -n "${CS2_PID}" ]; then
+        if [ -n "${CS2_PID:-}" ]; then
             log_message "Starting GDB debugger on port ${GDB_DEBUG_PORT} (PID: ${CS2_PID})" "info"
             log_message "The console may hang until you resume it through IDA Pro or GDB client" "warning"
-            gdbserver :${GDB_DEBUG_PORT} --attach ${CS2_PID} > /tmp/gdb.log 2>&1
+            gdbserver :"${GDB_DEBUG_PORT}" --attach "${CS2_PID}" > /tmp/gdb.log 2>&1
             log_message "GDB debugger stopped" "warning"
         else
             log_message "CS2 process not found after 30s timeout" "error"

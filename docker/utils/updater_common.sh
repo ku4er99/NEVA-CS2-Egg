@@ -31,40 +31,22 @@ get_github_release() {
     ' 2>/dev/null
 }
 
-# Get GitHub release info (supports prerelease via PRERELEASE env var)
-# Outputs JSON: {version, asset_url, asset_name, is_prerelease}
-get_github_release() {
-    local repo="$1"
-    local asset_pattern="${2:-.*}"
-    local url="https://api.github.com/repos/$repo/releases"
-
-    # Select endpoint based on prerelease setting (log to stderr to not pollute output)
-    if [ "${PRERELEASE:-0}" = "1" ]; then
-        log_message "Checking releases (prereleases enabled) for $repo" "debug" >&2
-    else
-        url="$url/latest"
-        log_message "Checking latest stable release for $repo" "debug" >&2
-    fi
-
-    curl -s "$url" 2>/dev/null | jq --arg p "$asset_pattern" '
-        (if type == "array" then .[0] else . end) //empty |
-        {
-            version: .tag_name,
-            is_prerelease: .prerelease,
-            asset_url: (first(.assets[] | select(.name | test($p)) | .browser_download_url) // ""),
-            asset_name: (first(.assets[] | select(.name | test($p)) | .name) // "")
-        }
-    ' 2>/dev/null
-}
-
 # Get current version from version file
 get_current_version() {
     local addon="$1"
-    if [ -f "$VERSION_FILE" ]; then
-        grep "^$addon=" "$VERSION_FILE" | cut -d'=' -f2
-    else
+    if [ ! -f "$VERSION_FILE" ]; then
         echo ""
+        return 0
     fi
+
+    local line=""
+    line="$(grep -m1 "^${addon}=" "$VERSION_FILE" 2>/dev/null || true)"
+    if [ -z "$line" ]; then
+        echo ""
+        return 0
+    fi
+
+    echo "${line#*=}"
 }
 
 # Update version file
@@ -75,7 +57,7 @@ update_version_file() {
     # Create directory if it doesn't exist
     mkdir -p "$(dirname "$VERSION_FILE")"
 
-    if [ -f "$VERSION_FILE" ] && grep -q "^$addon=" "$VERSION_FILE"; then
+    if [ -f "$VERSION_FILE" ] && grep -q "^${addon}=" "$VERSION_FILE" 2>/dev/null; then
         sed -i "s/^$addon=.*/$addon=$new_version/" "$VERSION_FILE"
     else
         echo "$addon=$new_version" >> "$VERSION_FILE"
