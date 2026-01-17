@@ -103,12 +103,12 @@ sync_files() {
 
         # Create the symlink
         if ln -sf "$vpk_file" "$link_path" 2>/dev/null; then
-            ((vpk_count++))
+            ((++vpk_count))
             vpk_total_size=$((vpk_total_size + file_size))
         else
             log_message "Failed to link: $rel_path" "warning"
         fi
-    done < <(find "$src_dir" -type f -name "*.vpk" -print0 2>/dev/null)
+    done < <(find "$src_dir" -type f -name "*.vpk" -print0 2>/dev/null || true)
 
     local human_total
     human_total=$(format_bytes "$vpk_total_size")
@@ -139,18 +139,18 @@ sync_cfg_files() {
     # Copy default config files ONLY if they don't already exist
     # This way we don't overwrite user's custom configs
     local synced_count=0
-    find "$cfg_src_dir" -type f \( -name "*.cfg" -o -name "*.vcfg" \) -print0 2>/dev/null | while IFS= read -r -d '' cfg_file; do
-        local filename="$(basename "$cfg_file")"
-        local dest_file="$cfg_dest_dir/$filename"
+    while IFS= read -r -d '' cfg_file; do
+        filename="$(basename "$cfg_file")"
+        dest_file="$cfg_dest_dir/$filename"
 
         if [ ! -e "$dest_file" ]; then
             if cp "$cfg_file" "$dest_file" 2>/dev/null; then
-                ((synced_count++))
+                ((++synced_count))
             else
                 log_message "Failed to copy: $filename" "warning"
             fi
         fi
-    done
+    done < <(find "$cfg_src_dir" -type f \( -name "*.cfg" -o -name "*.vcfg" \) -print0 2>/dev/null || true)
 
     if [ $synced_count -gt 0 ]; then
         log_message "Synced $synced_count default config file(s)" "debug"
