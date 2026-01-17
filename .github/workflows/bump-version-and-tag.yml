@@ -26,7 +26,7 @@ jobs:
 
       - name: Bump VERSION
         run: |
-          bash scripts/bump_version.sh
+          bash docker/scripts/bump_version.sh
           echo "Bumped to $NEW_VERSION ($NEW_TAG)"
 
       - name: Commit VERSION
