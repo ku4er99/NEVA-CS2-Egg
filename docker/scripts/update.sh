@@ -12,6 +12,7 @@ source /scripts/updaters/metamod.sh
 source /scripts/updaters/counterstrikesharp.sh
 source /scripts/updaters/swiftlys2.sh
 source /scripts/updaters/modsharp.sh
+source /scripts/updaters/nap.sh
 
 # Backwards compatibility: Map old ADDON_SELECTION to new boolean variables
 migrate_addon_selection() {
@@ -114,6 +115,13 @@ update_addons() {
 
         # Configure modsharp in gameinfo.gi
         add_to_gameinfo "sharp"
+    fi
+    
+    # NevaAdminPlugin
+    if [[ "${NEVA_ADMIN_PLUGIN:-0}" -eq 1 ]]; then
+        update_nap
+    else 
+        log_message "Disabled (NEVA_ADMIN_PLUGIN!=1)." "warning"
     fi
 
     # Ensure MetaMod is always first addon after LowViolence (if present)

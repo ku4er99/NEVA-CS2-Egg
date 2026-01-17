@@ -12,8 +12,9 @@ RUN         mkdir -p /etc/sudoers.d && \
 
 ENV         DEBIAN_FRONTEND=noninteractive
 RUN         apt update && \
-            apt install -y iproute2 jq unzip rsync curl && \
-            apt-get clean
+            apt install -y --no-install-recommends \
+              iproute2 jq unzip rsync curl ca-certificates python3 && \
+            rm -rf /var/lib/apt/lists/*
 
 # Create directories and copy files
 RUN         mkdir -p /scripts /utils
