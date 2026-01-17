@@ -164,31 +164,31 @@ cleanup_obsolete_configs() {
 
 # Check for deprecated variables
 # ! KEEP UNTIL 2026.01.01 !
-check_deprecated_variables() {
-    local found_deprecated=false
-
-    # Check for deprecated ADDON_SELECTION variable
-    if [ -n "${ADDON_SELECTION}" ]; then
-        log_message "⚠️  DEPRECATION WARNING ⚠️" "warning"
-        log_message "The ADDON_SELECTION variable is deprecated and will be removed in the next update!" "warning"
-        log_message "Please update your Pterodactyl egg to use the new multi-framework support:" "warning"
-        log_message "  → INSTALL_METAMOD (boolean)" "warning"
-        log_message "  → INSTALL_CSS (boolean)" "warning"
-        log_message "  → INSTALL_SWIFTLY (boolean)" "warning"
-        log_message "  → INSTALL_MODSHARP (boolean)" "warning"
-        log_message "Current ADDON_SELECTION value: ${ADDON_SELECTION}" "warning"
-        log_message "This will continue to work for now, but UPDATE YOUR EGG before the next patch!" "warning"
-        found_deprecated=true
-    fi
-
-    # Check for deprecated AUTO_UPDATE/UPDATE_AUTO_RESTART variables
-    if [ "${AUTO_UPDATE:-${UPDATE_AUTO_RESTART:-0}}" -eq 1 ]; then
-        log_message "⚠️  DEPRECATION WARNING ⚠️" "warning"
-        log_message "AUTO_UPDATE/UPDATE_AUTO_RESTART variables are deprecated!" "warning"
-        log_message "Internal auto-restart has been replaced by the centralized update script." "warning"
-        log_message "For automatic CS2 updates and server restarts:" "warning"
-        log_message "  → Use: misc/update-cs2-centralized.sh" "warning"
-        log_message "  → Documentation: https://github.com/K4ryuu/CS2-Egg/blob/main/docs/features/vpk-sync.md" "warning"
-        found_deprecated=true
-    fi
-}
+#check_deprecated_variables() {
+#    local found_deprecated=false
+#
+#    # Check for deprecated ADDON_SELECTION variable
+#    if [ -n "${ADDON_SELECTION}" ]; then
+#        log_message "⚠️  DEPRECATION WARNING ⚠️" "warning"
+#        log_message "The ADDON_SELECTION variable is deprecated and will be removed in the next update!" "warning"
+#        log_message "Please update your Pterodactyl egg to use the new multi-framework support:" "warning"
+#        log_message "  → INSTALL_METAMOD (boolean)" "warning"
+#        log_message "  → INSTALL_CSS (boolean)" "warning"
+#        log_message "  → INSTALL_SWIFTLY (boolean)" "warning"
+#        log_message "  → INSTALL_MODSHARP (boolean)" "warning"
+#        log_message "Current ADDON_SELECTION value: ${ADDON_SELECTION}" "warning"
+#        log_message "This will continue to work for now, but UPDATE YOUR EGG before the next patch!" "warning"
+#        found_deprecated=true
+#    fi
+#
+#    # Check for deprecated AUTO_UPDATE/UPDATE_AUTO_RESTART variables
+#    if [ "${AUTO_UPDATE:-${UPDATE_AUTO_RESTART:-0}}" -eq 1 ]; then
+#        log_message "⚠️  DEPRECATION WARNING ⚠️" "warning"
+#        log_message "AUTO_UPDATE/UPDATE_AUTO_RESTART variables are deprecated!" "warning"
+#        log_message "Internal auto-restart has been replaced by the centralized update script." "warning"
+#        log_message "For automatic CS2 updates and server restarts:" "warning"
+#        log_message "  → Use: misc/update-cs2-centralized.sh" "warning"
+#        log_message "  → Documentation: https://github.com/K4ryuu/CS2-Egg/blob/main/docs/features/vpk-sync.md" "warning"
+#        found_deprecated=true
+#    fi
+#}

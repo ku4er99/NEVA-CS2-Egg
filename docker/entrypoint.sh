@@ -22,7 +22,7 @@ migrate_legacy_files
 cleanup_obsolete_configs
 
 # Check for deprecated variables (ADDON_SELECTION)
-check_deprecated_variables
+#check_deprecated_variables
 
 # Initialize and load configurations
 init_configs

@@ -15,25 +15,25 @@ source /scripts/updaters/modsharp.sh
 source /scripts/updaters/nap.sh
 
 # Backwards compatibility: Map old ADDON_SELECTION to new boolean variables
-migrate_addon_selection() {
-    if [ -n "${ADDON_SELECTION}" ]; then
-        case "${ADDON_SELECTION}" in
-            "Metamod Only")
-                INSTALL_METAMOD=1
-                ;;
-            "Metamod + CounterStrikeSharp")
-                INSTALL_METAMOD=1
-                INSTALL_CSS=1
-                ;;
-            "SwiftlyS2")
-                INSTALL_SWIFTLY=1
-                ;;
-            "ModSharp")
-                INSTALL_MODSHARP=1
-                ;;
-        esac
-    fi
-}
+#migrate_addon_selection() {
+#    if [ -n "${ADDON_SELECTION}" ]; then
+#        case "${ADDON_SELECTION}" in
+#            "Metamod Only")
+#                INSTALL_METAMOD=1
+#                ;;
+#            "Metamod + CounterStrikeSharp")
+#                INSTALL_METAMOD=1
+#                INSTALL_CSS=1
+#                ;;
+#            "SwiftlyS2")
+#                INSTALL_SWIFTLY=1
+#                ;;
+#            "ModSharp")
+#                INSTALL_MODSHARP=1
+#                ;;
+#        esac
+#    fi
+#}
 
 # Main addon update function based on boolean variables
 update_addons() {
@@ -45,7 +45,7 @@ update_addons() {
     mkdir -p "$TEMP_DIR"
 
     # Backwards compatibility migration
-    migrate_addon_selection
+    #migrate_addon_selection
 
     # Dependency check: CSS requires MetaMod
     if [ "${INSTALL_CSS:-0}" -eq 1 ] && [ "${INSTALL_METAMOD:-0}" -ne 1 ]; then
