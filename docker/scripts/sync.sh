@@ -31,7 +31,7 @@ format_bytes() {
 
 sync_files() {
     # Bail early if sync isn't configured
-    if [ -z "${SYNC_LOCATION}" ] || [ "${SYNC_LOCATION}" == "" ]; then
+    if [ -z "${SYNC_LOCATION:-}" ]; then
         return 0
     fi
 
@@ -43,7 +43,7 @@ sync_files() {
         log_message "Sync location not found: $src_dir" "error"
         log_message "SYNC_LOCATION directory not found: $src_dir" "error"
         log_message "Make sure SYNC_LOCATION matches the path where your files are actually mounted to (TARGET)." "error"
-        exit 1
+        return 1
     fi
 
     log_message "Syncing VPK files..." "info"
@@ -51,18 +51,30 @@ sync_files() {
     # Sync everything EXCEPT .vpk files, configs, and gameinfo.gi
     # We'll symlink VPKs separately to save space
     # gameinfo.gi is excluded to preserve addon configurations
-    if rsync -aKLz --exclude '*.vpk' --exclude 'cfg/' --exclude 'game/csgo/gameinfo.gi' "$src_dir/" "$dest_dir" 2>/dev/null; then
-        : # base files synced silently
+    local rsync_log="/tmp/vpk-sync-rsync.log"
+    if rsync -aKLz --exclude '*.vpk' --exclude 'cfg/' --exclude 'game/csgo/gameinfo.gi' \
+        "$src_dir/" "$dest_dir" 2>"$rsync_log"; then
+        : # ok
     else
-        log_message "Failed to sync base files" "error"
-        return 1
+        local ec=$?
+        log_message "Failed to sync base files (rsync exit=$ec)" "error"
+        log_message "Rsync stderr (last 50 lines):" "error"
+        tail -n 50 "$rsync_log" 2>/dev/null | while IFS= read -r line; do
+            log_message "$line" "error"
+        done
+        return $ec
     fi
 
     # Copy gameinfo.gi only if it doesn't exist (first boot)
     local gameinfo_src="$src_dir/game/csgo/gameinfo.gi"
     local gameinfo_dest="$dest_dir/game/csgo/gameinfo.gi"
     if [ -f "$gameinfo_src" ] && [ ! -f "$gameinfo_dest" ]; then
-        cp "$gameinfo_src" "$gameinfo_dest" 2>/dev/null
+        if ! cp "$gameinfo_src" "$gameinfo_dest" 2>/tmp/vpk-sync-cp.log; then
+          log_message "Failed to copy initial gameinfo.gi" "warning"
+          tail -n 20 /tmp/vpk-sync-cp.log 2>/dev/null | while IFS= read -r line; do
+            log_message "$line" "warning"
+          done
+        fi
         log_message "Copied initial gameinfo.gi" "debug"
     fi
 
@@ -104,7 +116,7 @@ sync_files() {
 
 sync_cfg_files() {
     # Skip if sync isn't set up
-    if [ -z "${SYNC_LOCATION}" ] || [ "${SYNC_LOCATION}" == "" ]; then
+    if [ -z "${SYNC_LOCATION:-}" ]; then
         return 0
     fi
 
