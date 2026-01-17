@@ -118,10 +118,10 @@ update_addons() {
     fi
     
     # NevaAdminPlugin
-    if [[ "${NEVA_ADMIN_PLUGIN:-0}" -eq 1 ]]; then
+    if [[ "${NAP_ENABLED:-0}" -eq 1 ]]; then
         update_nap
     else 
-        log_message "Disabled (NEVA_ADMIN_PLUGIN!=1)." "warning"
+        log_message "Disabled (NAP_ENABLED!=1)." "warning"
     fi
 
     # Ensure MetaMod is always first addon after LowViolence (if present)

@@ -13,7 +13,7 @@
     "GitHub": "ghcr.io/ku4er99/neva-cs2-egg:latest"
   },
   "file_denylist": [],
-  "startup": "./game/cs2.sh {{CUSTOM_PARAMS}} -dedicated +ip 0.0.0.0 -port {{SERVER_PORT}} +map {{SRCDS_MAP}} -maxplayers {{SRCDS_MAXPLAYERS}} +sv_setsteamaccount {{STEAM_ACC}} +game_type {{GAME_TYPE}} +game_mode {{GAME_MODE}}",
+  "startup": "./game/cs2.sh {{CUSTOM_PARAMS}} +hostname {{NAP_ADDRESSES}} -dedicated +ip 0.0.0.0 -port {{SERVER_PORT}} +map {{SRCDS_MAP}} -maxplayers {{SRCDS_MAXPLAYERS}} +sv_setsteamaccount {{STEAM_ACC}} +game_type {{GAME_TYPE}} +game_mode {{GAME_MODE}}",
   "config": {
     "files": "{}",
     "startup": "{\r\n    \"done\": \"Source2Init OK\"\r\n}",
@@ -209,6 +209,16 @@
       "field_type": "text"
     },
     {
+      "name": "NevaAdminPlugin Addresses",
+      "description": "Variable for save information about HTTP addresses of NEVA Platform. guid - MatchId. Default - 00000000-0000-0000-0000-000000000000_sms.domain.ru_sms.domain.ru_sms.domain.ru_sms.domain.ru",
+      "env_variable": "NAP_ADDRESSES",
+      "default_value": "00000000-0000-0000-0000-000000000000_sms.domain.ru_api.domain.ru_ss.domain.ru_sms.domain.ru",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
       "name": "Allow Prerelease Updates",
       "description": "Allow downloading prerelease/beta versions of frameworks (CSS, SwiftlyS2, ModSharp) from GitHub. Warning: Prereleases may be unstable.",
       "env_variable": "PRERELEASE",
@@ -232,7 +242,7 @@
       "name": "Custom Parameters",
       "description": "Custom startup parameters to add to the command line.",
       "env_variable": "CUSTOM_PARAMS",
-      "default_value": "",
+      "default_value": "+bot_quota 0 -insecure",
       "user_viewable": true,
       "user_editable": true,
       "rules": "string|nullable",
