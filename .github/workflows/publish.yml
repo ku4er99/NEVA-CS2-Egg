@@ -2,7 +2,7 @@ name: build-and-push-image
 
 on:
   push:
-    branches: [ "main" ]
+    tags: [ "v*" ]
   workflow_dispatch:
 
 permissions:
@@ -11,37 +11,11 @@ permissions:
 
 jobs:
   build:
-    # не запускаться на коммиты, которые сделал бот релиза
-    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Configure git
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Bump VERSION
-        run: |
-          bash docker/scripts/bump_version.sh
-          echo "Bumped to $NEW_VERSION ($NEW_TAG)"
-
-      - name: Commit VERSION
-        run: |
-          git add VERSION
-          git commit -m "chore(release): $NEW_TAG [skip ci]" || exit 0
-
-      - name: Create tag
-        run: |
-          git tag -a "$NEW_TAG" -m "$NEW_TAG"
-
-      - name: Push commit and tag
-        run: |
-          git push origin HEAD:main
-          git push origin "$NEW_TAG"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
