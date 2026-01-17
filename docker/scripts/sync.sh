@@ -1,6 +1,9 @@
 #!/bin/bash
 source /utils/logging.sh
 
+set -o errtrace 2>/dev/null || true
+trap 'log_message "sync.sh crashed: line=${BASH_LINENO[0]} cmd=${BASH_COMMAND} exit=$?" "error"' ERR
+
 # Format bytes to human readable string
 format_bytes() {
     local size="$1"
