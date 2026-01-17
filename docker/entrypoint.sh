@@ -128,7 +128,7 @@ LOGGED_STARTUP=$(echo "${MODIFIED_STARTUP}" | \
 log_message "Starting server: ${LOGGED_STARTUP}" "info"
 
 # Start GDB debugger in background if port specified
-if [ -n "${GDB_DEBUG_PORT:-}" ]; then
+if [[ "${GDB_DEBUG_PORT:-0}" =~ ^[0-9]+$ ]] && [ "${GDB_DEBUG_PORT:-0}" -gt 0 ]; then
     (
         CS2_PID=""
         for i in {1..30}; do
@@ -146,8 +146,8 @@ if [ -n "${GDB_DEBUG_PORT:-}" ]; then
         if [ -n "${CS2_PID:-}" ]; then
             log_message "Starting GDB debugger on port ${GDB_DEBUG_PORT} (PID: ${CS2_PID})" "info"
             log_message "The console may hang until you resume it through IDA Pro or GDB client" "warning"
-            gdbserver :"${GDB_DEBUG_PORT}" --attach "${CS2_PID}" > /tmp/gdb.log 2>&1
-            log_message "GDB debugger stopped" "warning"
+            gdbserver :"${GDB_DEBUG_PORT}" --attach "${CS2_PID}" > /tmp/gdb.log 2>&1 || \
+              log_message "GDB server failed to start (see /tmp/gdb.log)" "warning"
         else
             log_message "CS2 process not found after 30s timeout" "error"
         fi
@@ -157,7 +157,7 @@ fi
 # Actually start the server and handle its output
 script -qfc "$MODIFIED_STARTUP" /dev/null 2>&1 | while IFS= read -r line; do
     line="${line%[[:space:]]}"
-    [[ "$line" =~ Segmentation\ fault.*"${GAMEEXE}" ]] && continue
+    [[ -n "${GAMEEXE:-}" && "$line" =~ Segmentation\ fault.*"${GAMEEXE}" ]] && continue
 
     # Detect crash via cs2.sh crash message pattern
     if [[ "$line" =~ \./game/cs2\.sh:.*Aborted.*\(core\ dumped\) ]]; then
