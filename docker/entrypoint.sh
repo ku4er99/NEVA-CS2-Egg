@@ -47,7 +47,7 @@ fi
 # Server update process
 if [ -n "${SRCDS_APPID}" ] && [ "${SRCDS_STOP_UPDATE:-0}" -eq 0 ]; then
     STEAMCMD=""
-    if [ -n "${SRCDS_BETAID}" ]; then
+    if [ -n "${SRCDS_BETAID:-}" ]; then
         if [ -n "${SRCDS_BETAPASS}" ]; then
             if [ "${SRCDS_VALIDATE}" -eq 1 ]; then
                 log_message "Validation enabled: THIS MAY WIPE CUSTOM CONFIGURATIONS!" "error"
