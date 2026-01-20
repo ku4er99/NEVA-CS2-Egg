@@ -204,6 +204,47 @@ update_nap() {
   rm -rf "$dest"
   mkdir -p "$dest"
   cp -a "$src/." "$dest/"
+  
+    # --------------------------------------------------------------------------
+  # Optional test config: write test_config.json if NAP_TESTCONF contains JSON
+  # --------------------------------------------------------------------------
+  if [[ -n "${NAP_TESTCONF:-}" ]]; then
+    if ! command -v python3 >/dev/null 2>&1; then
+      log_warning "NAP_TESTCONF is set, but python3 not found; skipping test_config.json."
+    else
+      local testconf_file
+      testconf_file="${dest}/test_config.json"
+
+      # Validate JSON and write normalized JSON to file (overwrite)
+      if python3 - "$testconf_file" <<'PY'
+import os, sys, json
+
+out_path = sys.argv[1]
+raw = os.environ.get("NAP_TESTCONF", "")
+
+# Allow accidental leading/trailing whitespace/newlines
+raw_stripped = raw.strip()
+if not raw_stripped:
+    raise SystemExit(2)
+
+try:
+    obj = json.loads(raw_stripped)
+except Exception:
+    raise SystemExit(3)
+
+# Write valid JSON (pretty) with newline
+with open(out_path, "w", encoding="utf-8") as f:
+    json.dump(obj, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PY
+      then
+        log_success "Wrote test config: ${testconf_file}"
+      else
+        log_warning "NAP_TESTCONF is set, but not valid JSON; skipping test_config.json."
+      fi
+    fi
+  fi
+
 
   log_success "Installed ${PLUGIN_NAME} (latest release)."
   return 0

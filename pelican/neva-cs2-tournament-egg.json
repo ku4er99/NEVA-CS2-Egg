@@ -219,6 +219,16 @@
       "field_type": "text"
     },
     {
+      "name": "NevaAdminPlugin Test JSON Configuration",
+      "description": "Variable for store JSON server configuration. Required in NAP_ADDRESSES GUID = 11111111-1111-1111-1111-111111111111 for test start and load this config.",
+      "env_variable": "NAP_TESTCONF",
+      "default_value": "",
+      "user_viewable": true,
+      "user_editable": true,
+      "rules": "required|string",
+      "field_type": "text"
+    },
+    {
       "name": "Allow Prerelease Updates",
       "description": "Allow downloading prerelease/beta versions of frameworks (CSS, SwiftlyS2, ModSharp) from GitHub. Warning: Prereleases may be unstable.",
       "env_variable": "PRERELEASE",
