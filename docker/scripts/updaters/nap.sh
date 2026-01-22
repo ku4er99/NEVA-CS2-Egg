@@ -206,21 +206,21 @@ update_nap() {
   cp -a "$src/." "$dest/"
   
     # --------------------------------------------------------------------------
-  # Optional test config: write test_config.json if NAP_TESTCONF contains JSON
+  # config: write config.json if NAP_JSON_CONF contains JSON
   # --------------------------------------------------------------------------
-  if [[ -n "${NAP_TESTCONF:-}" ]]; then
+  if [[ -n "${NAP_JSON_CONF:-}" ]]; then
     if ! command -v python3 >/dev/null 2>&1; then
-      log_warning "NAP_TESTCONF is set, but python3 not found; skipping test_config.json."
+      log_warning "NAP_JSON_CONF is set, but python3 not found; skipping config.json."
     else
-      local testconf_file
-      testconf_file="${dest}/test_config.json"
+      local conf_file
+      conf_file="${dest}/config.json"
 
       # Validate JSON and write normalized JSON to file (overwrite)
-      if python3 - "$testconf_file" <<'PY'
+      if python3 - "$conf_file" <<'PY'
 import os, sys, json
 
 out_path = sys.argv[1]
-raw = os.environ.get("NAP_TESTCONF", "")
+raw = os.environ.get("NAP_JSON_CONF", "")
 
 # Allow accidental leading/trailing whitespace/newlines
 raw_stripped = raw.strip()
@@ -238,9 +238,9 @@ with open(out_path, "w", encoding="utf-8") as f:
     f.write("\n")
 PY
       then
-        log_success "Wrote test config: ${testconf_file}"
+        log_success "Wrote config: ${conf_file}"
       else
-        log_warning "NAP_TESTCONF is set, but not valid JSON; skipping test_config.json."
+        log_warning "NAP_JSON_CONF is set, but not valid JSON; skipping config.json."
       fi
     fi
   fi
