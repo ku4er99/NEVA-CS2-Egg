@@ -77,7 +77,7 @@ handle_download_and_extract() {
     local max_retries=3
     local retry=0
     while [ $retry -lt $max_retries ]; do
-        if curl -fsSL -m 300 -o "$output_file" "$url"; then
+        if curl -4 -fsSL --connect-timeout 15 -o "$output_file" "$url"; then
             break
         fi
         ((retry++))
