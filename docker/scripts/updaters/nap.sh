@@ -76,41 +76,60 @@ download_private_latest_asset() {
   #  3) token
   #  4) output file
   local repo="$1"
-  local asset_name="$2"
+  local asset_id="$2"
   local token="$3"
   local out="$4"
 
   require_cmd curl
-  require_cmd python3
-
-  log_running "Resolving latest release via GitHub API: ${repo}"
-
-  local release_json
-  release_json="$(mktemp)"
-  curl -fsSL \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: application/vnd.github+json" \
-    -o "$release_json" \
-    "https://api.github.com/repos/${repo}/releases/latest"
-
-  local asset_id
-  asset_id="$(python3 -c "import json; d=json.load(open('$release_json')); n='$asset_name'; 
-assets=d.get('assets',[]);
-m=[a for a in assets if a.get('name')==n];
-print(m[0].get('id') if m else '')")"
-  rm -f "$release_json"
-
-  if [[ -z "$asset_id" ]]; then
-    log_error "Asset not found in latest release: ${asset_name}"
-    return 1
-  fi
-
-  log_running "Downloading asset '${asset_name}' (id=${asset_id})"
-  curl -fL --retry 3 --retry-delay 2 \
+  curl -4 -fL \
+    --connect-timeout 15 --max-time 180 \
+    --retry 5 --retry-delay 3 --retry-max-time 300 --retry-all-errors \
     -H "Authorization: Bearer ${token}" \
     -H "Accept: application/octet-stream" \
     -o "$out" \
     "https://api.github.com/repos/${repo}/releases/assets/${asset_id}"
+}
+
+resolve_private_latest_asset() {
+  # Prints: tag_name<TAB>asset_id
+  local repo="$1"
+  local asset_name="$2"
+  local token="$3"
+  local release_json
+
+  require_cmd curl
+  require_cmd python3
+
+  release_json="$(mktemp)"
+  if ! curl -4 -fsSL \
+    --connect-timeout 15 --max-time 60 \
+    --retry 3 --retry-delay 2 --retry-max-time 120 --retry-all-errors \
+    -H "Authorization: Bearer ${token}" \
+    -H "Accept: application/vnd.github+json" \
+    -o "$release_json" \
+    "https://api.github.com/repos/${repo}/releases/latest"; then
+    rm -f "$release_json"
+    return 1
+  fi
+
+  python3 - "$release_json" "$asset_name" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    release = json.load(f)
+
+asset_name = sys.argv[2]
+asset = next((item for item in release.get("assets", [])
+              if item.get("name") == asset_name), None)
+if not asset or not release.get("tag_name") or not asset.get("id"):
+    raise SystemExit(1)
+
+print(f"{release['tag_name']}\t{asset['id']}")
+PY
+  local status=$?
+  rm -f "$release_json"
+  return "$status"
 }
 
 download_with_token_header() {
@@ -124,10 +143,49 @@ download_with_token_header() {
 
   require_cmd curl
 
-  curl -fL --retry 3 --retry-delay 2 \
+  curl -4 -fL \
+    --connect-timeout 15 --max-time 180 \
+    --retry 5 --retry-delay 3 --retry-max-time 300 --retry-all-errors \
     -H "Authorization: Bearer ${token}" \
     -o "$out" \
     "$url"
+}
+
+write_nap_config() {
+  local dest="$1"
+
+  if [[ -z "${NAP_JSON_CONF:-}" ]]; then
+    return 0
+  fi
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    log_warning "NAP_JSON_CONF is set, but python3 not found; skipping config.json."
+    return 0
+  fi
+
+  local conf_file="${dest}/config.json"
+  if python3 - "$conf_file" <<'PY'
+import os, sys, json
+
+out_path = sys.argv[1]
+raw = os.environ.get("NAP_JSON_CONF", "").strip()
+if not raw:
+    raise SystemExit(2)
+
+try:
+    obj = json.loads(raw)
+except Exception:
+    raise SystemExit(3)
+
+with open(out_path, "w", encoding="utf-8") as f:
+    json.dump(obj, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+PY
+  then
+    log_success "Wrote config: ${conf_file}"
+  else
+    log_warning "NAP_JSON_CONF is set, but not valid JSON; skipping config.json."
+  fi
 }
 
 # ------------------------------------------------------------------------------
@@ -163,11 +221,12 @@ update_nap() {
   trap "rm -rf '$tmpdir'" RETURN
 
   # Decide what to download
-  local asset_name token repo url
+  local asset_name token repo url dest release_info release_tag asset_id release_key current_version
   asset_name="${NAP_ASSET:-$ASSET_DEFAULT}"
   token="${NAP_GH_TOKEN:-}"
   repo="${NAP_GH_REPO:-}"
   url="${NAP_ZIP_URL:-}"
+  dest="${CSS_PLUGINS_DIR}/${PLUGIN_NAME}"
 
   if [[ -z "$token" ]]; then
     log_warning "NAP_GH_TOKEN is not set. Private repo download will fail."
@@ -178,13 +237,55 @@ update_nap() {
 
   if [[ -n "$url" ]]; then
     log_running "Downloading (direct URL): ${url}"
-    download_with_token_header "$url" "$token" "$zipfile"
+    if ! download_with_token_header "$url" "$token" "$zipfile"; then
+      if [[ -d "$dest" ]]; then
+        log_warning "Download failed; keeping the currently installed plugin."
+        write_nap_config "$dest"
+        return 0
+      fi
+      log_error "Download failed and no installed plugin is available."
+      return 1
+    fi
   else
     if [[ -z "$repo" ]]; then
       log_warning "NAP_GH_REPO is empty and NAP_ZIP_URL not set. Can't download."
       return 0
     fi
-    download_private_latest_asset "$repo" "$asset_name" "$token" "$zipfile"
+    log_running "Resolving latest release via GitHub API: ${repo}"
+    if ! release_info="$(resolve_private_latest_asset "$repo" "$asset_name" "$token")"; then
+      if [[ -d "$dest" ]]; then
+        log_warning "Could not resolve the latest release; keeping the currently installed plugin."
+        write_nap_config "$dest"
+        return 0
+      fi
+      log_error "Could not resolve the latest release and no installed plugin is available."
+      return 1
+    fi
+
+    IFS=$'\t' read -r release_tag asset_id <<< "$release_info"
+    if [[ -z "$release_tag" || -z "$asset_id" ]]; then
+      log_error "Asset not found in latest release: ${asset_name}"
+      return 1
+    fi
+
+    release_key="${release_tag}:${asset_id}"
+    current_version="$(get_current_version "NevaAdminPlugin")"
+    if [[ "$current_version" == "$release_key" && -d "$dest" ]]; then
+      log_success "Already up to date (${release_tag}, asset id=${asset_id}); skipping download."
+      write_nap_config "$dest"
+      return 0
+    fi
+
+    log_running "Downloading asset '${asset_name}' (tag=${release_tag}, id=${asset_id})"
+    if ! download_private_latest_asset "$repo" "$asset_id" "$token" "$zipfile"; then
+      if [[ -d "$dest" ]]; then
+        log_warning "Download failed; keeping the currently installed plugin (${current_version:-unknown version})."
+        write_nap_config "$dest"
+        return 0
+      fi
+      log_error "Download failed and no installed plugin is available."
+      return 1
+    fi
   fi
 
   # Unpack
@@ -192,13 +293,12 @@ update_nap() {
   unzip -oq "$zipfile" -d "$tmpdir/unpacked"
 
   # Determine content root (zip may contain PLUGIN_NAME/...)
-  local src dest
+  local src
   src="$tmpdir/unpacked"
   if [[ -d "$tmpdir/unpacked/$PLUGIN_NAME" ]]; then
     src="$tmpdir/unpacked/$PLUGIN_NAME"
   fi
 
-  dest="${CSS_PLUGINS_DIR}/${PLUGIN_NAME}"
   log_running "Installing to: ${dest}"
 
   rm -rf "$dest"
@@ -208,41 +308,10 @@ update_nap() {
     # --------------------------------------------------------------------------
   # config: write config.json if NAP_JSON_CONF contains JSON
   # --------------------------------------------------------------------------
-  if [[ -n "${NAP_JSON_CONF:-}" ]]; then
-    if ! command -v python3 >/dev/null 2>&1; then
-      log_warning "NAP_JSON_CONF is set, but python3 not found; skipping config.json."
-    else
-      local conf_file
-      conf_file="${dest}/config.json"
+  write_nap_config "$dest"
 
-      # Validate JSON and write normalized JSON to file (overwrite)
-      if python3 - "$conf_file" <<'PY'
-import os, sys, json
-
-out_path = sys.argv[1]
-raw = os.environ.get("NAP_JSON_CONF", "")
-
-# Allow accidental leading/trailing whitespace/newlines
-raw_stripped = raw.strip()
-if not raw_stripped:
-    raise SystemExit(2)
-
-try:
-    obj = json.loads(raw_stripped)
-except Exception:
-    raise SystemExit(3)
-
-# Write valid JSON (pretty) with newline
-with open(out_path, "w", encoding="utf-8") as f:
-    json.dump(obj, f, ensure_ascii=False, indent=2)
-    f.write("\n")
-PY
-      then
-        log_success "Wrote config: ${conf_file}"
-      else
-        log_warning "NAP_JSON_CONF is set, but not valid JSON; skipping config.json."
-      fi
-    fi
+  if [[ -z "$url" ]]; then
+    update_version_file "NevaAdminPlugin" "$release_key"
   fi
 
 
