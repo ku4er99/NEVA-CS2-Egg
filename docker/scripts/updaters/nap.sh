@@ -18,6 +18,7 @@ ASSET_DEFAULT="${PLUGIN_NAME}-linux-x64.zip"
 #   NAP_GH_TOKEN=...                    (PAT / fine-grained token with read access)
 #   NAP_ASSET=...                       (optional, default: ${ASSET_DEFAULT})
 #   NAP_ZIP_URL=...                     (optional direct URL; still needs token if private)
+#   NAP_SB_Placements=...               (optional SponsorBoards placements JSON)
 
 log_info()    { log_message "[NevaAdminPlugin] $*"; }
 log_running() { log_message "[NevaAdminPlugin] $*" "running"; }
@@ -188,6 +189,62 @@ PY
   fi
 }
 
+write_sponsorboards_placements() {
+  local css_plugins_dir="$1"
+
+  if [[ -z "${NAP_SB_Placements:-}" ]]; then
+    return 0
+  fi
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    log_warning "NAP_SB_Placements is set, but python3 not found; keeping the existing placements.json."
+    return 0
+  fi
+
+  local sponsorboards_dir placements_file
+  sponsorboards_dir="$(dirname "$css_plugins_dir")/configs/plugins/${PLUGIN_NAME}/sponsorboards"
+  placements_file="${sponsorboards_dir}/placements.json"
+  mkdir -p "$sponsorboards_dir"
+
+  if NAP_SB_Placements="$NAP_SB_Placements" NAP_SB_PLACEMENTS_FILE="$placements_file" python3 - <<'PY'
+import json
+import os
+import pathlib
+import tempfile
+
+raw = os.environ.get("NAP_SB_Placements", "").strip()
+target = pathlib.Path(os.environ["NAP_SB_PLACEMENTS_FILE"])
+
+try:
+    document = json.loads(raw)
+except (TypeError, json.JSONDecodeError):
+    raise SystemExit(2)
+
+if not isinstance(document, dict) or not isinstance(document.get("Boards"), list):
+    raise SystemExit(3)
+
+fd, temporary = tempfile.mkstemp(prefix="placements.", suffix=".tmp", dir=target.parent)
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        json.dump(document, stream, ensure_ascii=False, indent=2)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, target)
+except BaseException:
+    try:
+        os.unlink(temporary)
+    except FileNotFoundError:
+        pass
+    raise
+PY
+  then
+    log_success "Wrote SponsorBoards placements: ${placements_file}"
+  else
+    log_warning "NAP_SB_Placements is not a valid placements document; keeping the existing placements.json."
+  fi
+}
+
 # ------------------------------------------------------------------------------
 # Main entry (call from update.sh): update_nap
 # ------------------------------------------------------------------------------
@@ -227,6 +284,12 @@ update_nap() {
   repo="${NAP_GH_REPO:-}"
   url="${NAP_ZIP_URL:-}"
   dest="${CSS_PLUGINS_DIR}/${PLUGIN_NAME}"
+
+  # Runtime configuration (including SponsorBoards placements) lives under
+  # addons/counterstrikesharp/configs, outside this DLL deployment directory.
+  # Keep installation scoped to dest so updates never remove that state.
+
+  write_sponsorboards_placements "$CSS_PLUGINS_DIR"
 
   if [[ -z "$token" ]]; then
     log_warning "NAP_GH_TOKEN is not set. Private repo download will fail."

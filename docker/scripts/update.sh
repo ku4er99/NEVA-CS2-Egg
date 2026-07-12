@@ -9,6 +9,7 @@ TEMP_DIR="./temps"
 
 # Source modular updaters
 source /scripts/updaters/metamod.sh
+source /scripts/updaters/multiaddonmanager.sh
 source /scripts/updaters/counterstrikesharp.sh
 source /scripts/updaters/swiftlys2.sh
 source /scripts/updaters/modsharp.sh
@@ -48,6 +49,10 @@ update_addons() {
     #migrate_addon_selection
 
     # Dependency check: CSS requires MetaMod
+    if [[ "${INSTALL_MULTIADDONMANAGER:-0}" -eq 1 ]]; then
+        INSTALL_METAMOD=1
+    fi
+
     if [ "${INSTALL_CSS:-0}" -eq 1 ] && [ "${INSTALL_METAMOD:-0}" -ne 1 ]; then
         log_message "CounterStrikeSharp requires MetaMod:Source, auto-enabling..." "warning"
         INSTALL_METAMOD=1
@@ -75,6 +80,12 @@ update_addons() {
 
         # Configure metamod in gameinfo.gi
         add_to_gameinfo "csgo/addons/metamod"
+    fi
+
+    # MultiAddonManager must be ready before CounterStrikeSharp/NAP starts.
+    if [[ "${INSTALL_MULTIADDONMANAGER:-0}" -eq 1 ]]; then
+        update_multiaddonmanager
+        configure_multiaddonmanager
     fi
 
     # CounterStrikeSharp
@@ -133,4 +144,3 @@ update_addons() {
     # Clean up
     rm -rf "$TEMP_DIR"
 }
-

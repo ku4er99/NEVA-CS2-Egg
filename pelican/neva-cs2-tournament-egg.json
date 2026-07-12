@@ -234,6 +234,86 @@
             "sort": 15
         },
         {
+            "name": "MultiAddonManager",
+            "description": "Installs and updates the Metamod MultiAddonManager plugin. Metamod is enabled automatically when this is enabled.",
+            "env_variable": "INSTALL_MULTIADDONMANAGER",
+            "default_value": "1",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": [
+                "required",
+                "boolean"
+            ],
+            "sort": 26
+        },
+        {
+            "name": "MultiAddonManager Server Addons",
+            "description": "Comma-separated Steam Workshop addon IDs mounted by the server. Includes the NEVA SponsorBoards resources.",
+            "env_variable": "MAM_EXTRA_ADDONS",
+            "default_value": "3763253081",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": [
+                "required",
+                "regex:/^\\d+(,\\d+)*$/"
+            ],
+            "sort": 27
+        },
+        {
+            "name": "MultiAddonManager Client Addons",
+            "description": "Optional comma-separated client-only Steam Workshop addon IDs.",
+            "env_variable": "MAM_CLIENT_EXTRA_ADDONS",
+            "default_value": "",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": [
+                "nullable",
+                "regex:/^\\d+(,\\d+)*$/"
+            ],
+            "sort": 28
+        },
+        {
+            "name": "MultiAddonManager Extra Addons Timeout",
+            "description": "Seconds allowed between client reconnects while extra addons download.",
+            "env_variable": "MAM_EXTRA_ADDONS_TIMEOUT",
+            "default_value": "10",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": [
+                "required",
+                "integer",
+                "min:0"
+            ],
+            "sort": 29
+        },
+        {
+            "name": "MultiAddonManager Connection Timeout",
+            "description": "Maximum client addon connection timeout in seconds.",
+            "env_variable": "MAM_ADDON_CONNECTION_TIMEOUT",
+            "default_value": "30",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": [
+                "required",
+                "integer",
+                "min:0"
+            ],
+            "sort": 30
+        },
+        {
+            "name": "MultiAddonManager Mount Download",
+            "description": "Forces a Workshop download check before mounting so addon updates are applied immediately.",
+            "env_variable": "MAM_MOUNT_DOWNLOAD",
+            "default_value": "1",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": [
+                "required",
+                "boolean"
+            ],
+            "sort": 31
+        },
+        {
             "name": "NevaAdminPlugin",
             "description": "If enabled, downloads and installs the latest NevaAdminPlugin into CounterStrikeSharp plugins on every server start.",
             "env_variable": "NAP_ENABLED",
@@ -284,6 +364,19 @@
                 "nullable"
             ],
             "sort": 20
+        },
+        {
+            "name": "NevaAdminPlugin SponsorBoards Placements",
+            "description": "Optional SponsorBoards placements JSON. When non-empty, it replaces sponsorboards/placements.json atomically on server startup; when empty, the existing file is preserved.",
+            "env_variable": "NAP_SB_Placements",
+            "default_value": "",
+            "user_viewable": false,
+            "user_editable": false,
+            "rules": [
+                "nullable",
+                "json"
+            ],
+            "sort": 32
         },
         {
             "name": "NevaAdminPlugin Repo",

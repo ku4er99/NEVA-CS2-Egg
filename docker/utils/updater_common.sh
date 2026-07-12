@@ -99,12 +99,20 @@ handle_download_and_extract() {
 
     case $file_type in
         "zip")
+            if unzip -Z1 "$output_file" | grep -Eq '(^/|(^|/)\.\.(/|$)|^[[:alpha:]]:)'; then
+                log_message "Archive contains an unsafe path" "error"
+                return 1
+            fi
             unzip -qq -o "$output_file" -d "$extract_dir" || {
                 log_message "Failed to extract zip file" "error"
                 return 1
             }
             ;;
         "tar.gz")
+            if tar -tzf "$output_file" | grep -Eq '(^/|(^|/)\.\.(/|$)|^[[:alpha:]]:)'; then
+                log_message "Archive contains an unsafe path" "error"
+                return 1
+            fi
             tar -xzf "$output_file" -C "$extract_dir" || {
                 log_message "Failed to extract tar.gz file" "error"
                 return 1
