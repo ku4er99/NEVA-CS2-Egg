@@ -1,4 +1,4 @@
-{
+﻿{
     "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PANEL",
     "meta": {
         "version": "PLCN_v3",
@@ -368,7 +368,7 @@
         {
             "name": "NevaAdminPlugin SponsorBoards Placements",
             "description": "Optional SponsorBoards placements JSON. When non-empty, it replaces sponsorboards/placements.json atomically on server startup; when empty, the existing file is preserved.",
-            "env_variable": "NAP_SB_Placements",
+            "env_variable": "NAP_SB_PLACEMENTS",
             "default_value": "",
             "user_viewable": false,
             "user_editable": false,

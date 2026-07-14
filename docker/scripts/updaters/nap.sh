@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # NevaAdminPlugin updater/installer for CounterStrikeSharp (private GitHub repo supported)
 
 set -euo pipefail
@@ -18,7 +18,7 @@ ASSET_DEFAULT="${PLUGIN_NAME}-linux-x64.zip"
 #   NAP_GH_TOKEN=...                    (PAT / fine-grained token with read access)
 #   NAP_ASSET=...                       (optional, default: ${ASSET_DEFAULT})
 #   NAP_ZIP_URL=...                     (optional direct URL; still needs token if private)
-#   NAP_SB_Placements=...               (optional SponsorBoards placements JSON)
+#   NAP_SB_PLACEMENTS=...               (optional SponsorBoards placements JSON)
 
 log_info()    { log_message "[NevaAdminPlugin] $*"; }
 log_running() { log_message "[NevaAdminPlugin] $*" "running"; }
@@ -192,12 +192,13 @@ PY
 write_sponsorboards_placements() {
   local css_plugins_dir="$1"
 
-  if [[ -z "${NAP_SB_Placements:-}" ]]; then
+  if [[ -z "${NAP_SB_PLACEMENTS:-}" ]]; then
+    log_warning "NAP_SB_PLACEMENTS is not set, skip changing placements.json."
     return 0
   fi
 
   if ! command -v python3 >/dev/null 2>&1; then
-    log_warning "NAP_SB_Placements is set, but python3 not found; keeping the existing placements.json."
+    log_warning "NAP_SB_PLACEMENTS is set, but python3 not found; keeping the existing placements.json."
     return 0
   fi
 
@@ -206,13 +207,13 @@ write_sponsorboards_placements() {
   placements_file="${sponsorboards_dir}/placements.json"
   mkdir -p "$sponsorboards_dir"
 
-  if NAP_SB_Placements="$NAP_SB_Placements" NAP_SB_PLACEMENTS_FILE="$placements_file" python3 - <<'PY'
+  if NAP_SB_PLACEMENTS="$NAP_SB_PLACEMENTS" NAP_SB_PLACEMENTS_FILE="$placements_file" python3 - <<'PY'
 import json
 import os
 import pathlib
 import tempfile
 
-raw = os.environ.get("NAP_SB_Placements", "").strip()
+raw = os.environ.get("NAP_SB_PLACEMENTS", "").strip()
 target = pathlib.Path(os.environ["NAP_SB_PLACEMENTS_FILE"])
 
 try:
@@ -241,7 +242,7 @@ PY
   then
     log_success "Wrote SponsorBoards placements: ${placements_file}"
   else
-    log_warning "NAP_SB_Placements is not a valid placements document; keeping the existing placements.json."
+    log_warning "NAP_SB_PLACEMENTS is not a valid placements document; keeping the existing placements.json."
   fi
 }
 

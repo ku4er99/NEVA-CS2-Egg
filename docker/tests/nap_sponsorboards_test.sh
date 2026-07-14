@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -20,12 +20,12 @@ placements="./game/csgo/addons/counterstrikesharp/configs/plugins/NEVA.CS2.NevaA
 # Empty input leaves an existing placements file untouched.
 mkdir -p "$(dirname "$placements")"
 printf '%s\n' '{"Boards":[{"Id":"existing"}]}' > "$placements"
-unset NAP_SB_Placements
+unset NAP_SB_PLACEMENTS
 write_sponsorboards_placements "$plugins_dir"
 grep -q 'existing' "$placements"
 
 # Valid input atomically replaces the file.
-export NAP_SB_Placements='{"Boards":[{"Map":"de_mirage","Id":"A","Model":"models/sponsors/de_mirage_a_asus_board.vmdl","X":123.45,"Y":-456.78,"Z":64.0,"Pitch":0.0,"Yaw":90.0,"Roll":0.0,"Scale":0.5}]}'
+export NAP_SB_PLACEMENTS='{"Boards":[{"Map":"de_mirage","Id":"A","Model":"models/sponsors/de_mirage_a_asus_board.vmdl","X":123.45,"Y":-456.78,"Z":64.0,"Pitch":0.0,"Yaw":90.0,"Roll":0.0,"Scale":0.5}]}'
 write_sponsorboards_placements "$plugins_dir"
 python3 - "$placements" <<'PY'
 import json
@@ -38,7 +38,7 @@ PY
 
 # Invalid non-empty input also preserves the last valid file.
 before="$(sha256sum "$placements")"
-export NAP_SB_Placements='{"unexpected":[]}'
+export NAP_SB_PLACEMENTS='{"unexpected":[]}'
 write_sponsorboards_placements "$plugins_dir"
 [ "$before" = "$(sha256sum "$placements")" ]
 
