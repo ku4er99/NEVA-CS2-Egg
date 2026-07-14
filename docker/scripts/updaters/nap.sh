@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # NevaAdminPlugin updater/installer for CounterStrikeSharp (private GitHub repo supported)
 
 set -euo pipefail
