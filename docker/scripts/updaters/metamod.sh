@@ -9,7 +9,16 @@ get_metamod_release() {
     local repo="alliedmodders/metamod-source"
     local api_url="https://api.github.com/repos/${repo}/releases"
 
+    if [ "${RELEASE_FREEZE:-0}" = "1" ]; then
+        if [ -z "${METAMOD_RELEASE_TAG:-}" ]; then
+            log_message "RELEASE_FREEZE=1 requires METAMOD_RELEASE_TAG" "error" >&2
+            return 1
+        fi
+        api_url="${api_url}/tags/$(printf '%s' "$METAMOD_RELEASE_TAG" | jq -sRr @uri)"
+    fi
+
     curl -4 -fsSL --connect-timeout 15 --max-time 60 "$api_url" 2>/dev/null | jq -r '
+        (if type == "array" then . else [.] end) |
         [
             .[]
             | select(.tag_name | startswith("2.0."))

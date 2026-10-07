@@ -10,10 +10,18 @@ TEMP_DIR="./temps"
 get_github_release() {
     local repo="$1"
     local asset_pattern="${2:-.*}"
+    local pinned_tag="${3:-}"
     local url="https://api.github.com/repos/$repo/releases"
 
     # Select endpoint based on prerelease setting (log to stderr to not pollute output)
-    if [ "${PRERELEASE:-0}" = "1" ]; then
+    if [ "${RELEASE_FREEZE:-0}" = "1" ]; then
+        if [ -z "$pinned_tag" ]; then
+            log_message "RELEASE_FREEZE=1 requires a pinned release tag for $repo" "error" >&2
+            return 1
+        fi
+        url="$url/tags/$(printf '%s' "$pinned_tag" | jq -sRr @uri)"
+        log_message "Using pinned release $pinned_tag for $repo" "debug" >&2
+    elif [ "${PRERELEASE:-0}" = "1" ]; then
         log_message "Checking releases (prereleases enabled) for $repo" "debug" >&2
     else
         url="$url/latest"

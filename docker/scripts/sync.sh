@@ -55,7 +55,7 @@ sync_files() {
     # We'll symlink VPKs separately to save space
     # gameinfo.gi is excluded to preserve addon configurations
     local rsync_log="/tmp/vpk-sync-rsync.log"
-    if rsync -aKLz --exclude '*.vpk' --exclude 'cfg/' --exclude 'game/csgo/gameinfo.gi' \
+    if rsync -aKLz --exclude '.neva-releases/' --exclude '*.vpk' --exclude 'cfg/' --exclude 'game/csgo/gameinfo.gi' \
         "$src_dir/" "$dest_dir" 2>"$rsync_log"; then
         : # ok
     else

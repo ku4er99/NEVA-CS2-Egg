@@ -18,6 +18,7 @@ ASSET_DEFAULT="${PLUGIN_NAME}-linux-x64.zip"
 #   NAP_GH_TOKEN=...                    (PAT / fine-grained token with read access)
 #   NAP_ASSET=...                       (optional, default: ${ASSET_DEFAULT})
 #   NAP_ZIP_URL=...                     (optional direct URL; still needs token if private)
+#   NAP_RELEASE_TAG=...                 (required when RELEASE_FREEZE=1)
 #   NAP_SB_PLACEMENTS=...               (optional SponsorBoards placements JSON)
 
 log_info()    { log_message "[NevaAdminPlugin] $*"; }
@@ -97,6 +98,15 @@ resolve_private_latest_asset() {
   local asset_name="$2"
   local token="$3"
   local release_json
+  local release_path="latest"
+
+  if [[ "${RELEASE_FREEZE:-0}" == "1" ]]; then
+    if [[ -z "${NAP_RELEASE_TAG:-}" ]]; then
+      log_error "RELEASE_FREEZE=1 requires NAP_RELEASE_TAG"
+      return 1
+    fi
+    release_path="tags/$(printf '%s' "$NAP_RELEASE_TAG" | jq -sRr @uri)"
+  fi
 
   require_cmd curl
   require_cmd python3
@@ -108,7 +118,7 @@ resolve_private_latest_asset() {
     -H "Authorization: Bearer ${token}" \
     -H "Accept: application/vnd.github+json" \
     -o "$release_json" \
-    "https://api.github.com/repos/${repo}/releases/latest"; then
+    "https://api.github.com/repos/${repo}/releases/${release_path}"; then
     rm -f "$release_json"
     return 1
   fi
@@ -292,14 +302,35 @@ update_nap() {
 
   write_sponsorboards_placements "$CSS_PLUGINS_DIR"
 
-  if [[ -z "$token" ]]; then
+  if [[ "${RELEASE_FREEZE:-0}" == "1" && -z "${NAP_RELEASE_TAG:-}" ]]; then
+    log_error "RELEASE_FREEZE requires NAP_RELEASE_TAG"
+    return 1
+  fi
+
+  if [[ -n "${NAP_LOCAL_ARCHIVE:-}" ]]; then
+    if [[ "$NAP_LOCAL_ARCHIVE" != /tmp/cs2_ds/.neva-releases/* || -z "${NAP_LOCAL_ARCHIVE_SHA256:-}" ]]; then
+      log_error "Local NAP archive must be in the read-only release cache and have a SHA-256 pin"
+      return 1
+    fi
+    if ! printf '%s  %s\n' "$NAP_LOCAL_ARCHIVE_SHA256" "$NAP_LOCAL_ARCHIVE" | sha256sum --check --status; then
+      log_error "Local NAP release checksum mismatch"
+      return 1
+    fi
+    release_key="${NAP_RELEASE_TAG}:${NAP_LOCAL_ARCHIVE_SHA256}"
+    current_version="$(get_current_version "NevaAdminPlugin")"
+    if [[ "$current_version" == "$release_key" && -f "$dest/${PLUGIN_NAME}.dll" ]]; then
+      write_nap_config "$dest"
+      return 0
+    fi
+    cp "$NAP_LOCAL_ARCHIVE" "$zipfile"
+  elif [[ -z "$token" ]]; then
     log_warning "NAP_GH_TOKEN is not set. Private repo download will fail."
-    return 0
+    return 1
   fi
 
   log_info "Plugins dir: ${CSS_PLUGINS_DIR}"
 
-  if [[ -n "$url" ]]; then
+  if [[ -z "${NAP_LOCAL_ARCHIVE:-}" && -n "$url" ]]; then
     log_running "Downloading (direct URL): ${url}"
     if ! download_with_token_header "$url" "$token" "$zipfile"; then
       if [[ -d "$dest" ]]; then
@@ -310,7 +341,7 @@ update_nap() {
       log_error "Download failed and no installed plugin is available."
       return 1
     fi
-  else
+  elif [[ -z "${NAP_LOCAL_ARCHIVE:-}" ]]; then
     if [[ -z "$repo" ]]; then
       log_warning "NAP_GH_REPO is empty and NAP_ZIP_URL not set. Can't download."
       return 0
@@ -374,7 +405,7 @@ update_nap() {
   # --------------------------------------------------------------------------
   write_nap_config "$dest"
 
-  if [[ -z "$url" ]]; then
+  if [[ -n "${NAP_LOCAL_ARCHIVE:-}" || -z "$url" ]]; then
     update_version_file "NevaAdminPlugin" "$release_key"
   fi
 

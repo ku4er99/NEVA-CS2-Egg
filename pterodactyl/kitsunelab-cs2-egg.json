@@ -182,6 +182,76 @@
       "field_type": "text"
     },
     {
+      "name": "Freeze Addon Releases",
+      "description": "When enabled, every installed addon must use its explicitly configured release tag; latest/prerelease discovery is disabled.",
+      "env_variable": "RELEASE_FREEZE",
+      "default_value": "0",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "required|boolean",
+      "field_type": "text"
+    },
+    {
+      "name": "Pinned MetaMod Release",
+      "description": "Exact GitHub release tag used when RELEASE_FREEZE=1.",
+      "env_variable": "METAMOD_RELEASE_TAG",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Pinned CounterStrikeSharp Release",
+      "description": "Exact GitHub release tag used when RELEASE_FREEZE=1.",
+      "env_variable": "CSS_RELEASE_TAG",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Pinned Swiftly Release",
+      "description": "Exact GitHub release tag used when RELEASE_FREEZE=1.",
+      "env_variable": "SWIFTLY_RELEASE_TAG",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Pinned ModSharp Release",
+      "description": "Exact GitHub release tag used when RELEASE_FREEZE=1.",
+      "env_variable": "MODSHARP_RELEASE_TAG",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Pinned MultiAddonManager Release",
+      "description": "Exact GitHub release tag used when RELEASE_FREEZE=1.",
+      "env_variable": "MAM_RELEASE_TAG",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string|max:100",
+      "field_type": "text"
+    },
+    {
+      "name": "Pinned NevaAdminPlugin Release",
+      "description": "Exact private GitHub release tag used when RELEASE_FREEZE=1.",
+      "env_variable": "NAP_RELEASE_TAG",
+      "default_value": "",
+      "user_viewable": false,
+      "user_editable": false,
+      "rules": "nullable|string|max:100",
+      "field_type": "text"
+    },
+    {
       "name": "Console Filter",
       "description": "Filter unwanted console messages. Configure filter patterns in /egg/configs/console-filter.json",
       "env_variable": "ENABLE_FILTER",
@@ -230,6 +300,26 @@
       "user_editable": false,
       "rules": "nullable|numeric",
       "field_type": "text"
+    },
+    {
+      "user_viewable": false,
+      "rules": "nullable|string",
+      "description": "Read-only worker release cache; avoids GitHub credentials on game hosts",
+      "default_value": "",
+      "field_type": "text",
+      "name": "Local NAP release archive",
+      "env_variable": "NAP_LOCAL_ARCHIVE",
+      "user_editable": false
+    },
+    {
+      "user_viewable": false,
+      "rules": "nullable|string|max:64",
+      "description": "Exact SHA-256 of the cached private release",
+      "default_value": "",
+      "field_type": "text",
+      "name": "Local NAP SHA-256",
+      "env_variable": "NAP_LOCAL_ARCHIVE_SHA256",
+      "user_editable": false
     }
   ]
 }

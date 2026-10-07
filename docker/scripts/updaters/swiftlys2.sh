@@ -15,7 +15,7 @@ update_swiftly() {
     rm -rf "$temp_dir"/*
 
     local release_info
-    release_info=$(get_github_release "$REPO" "linux.*with-runtimes\\.zip")
+    release_info=$(get_github_release "$REPO" "linux.*with-runtimes\\.zip" "${SWIFTLY_RELEASE_TAG:-}")
 
     # Validate JSON response
     if [ -z "$release_info" ] || ! echo "$release_info" | jq -e . >/dev/null 2>&1; then

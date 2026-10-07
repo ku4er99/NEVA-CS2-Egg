@@ -69,7 +69,13 @@ update_modsharp() {
     local api_url="https://api.github.com/repos/$repo/releases"
     local release_info
 
-    if [ "${PRERELEASE:-0}" -eq 1 ]; then
+    if [ "${RELEASE_FREEZE:-0}" = "1" ]; then
+        if [ -z "${MODSHARP_RELEASE_TAG:-}" ]; then
+            log_message "RELEASE_FREEZE=1 requires MODSHARP_RELEASE_TAG" "error"
+            return 1
+        fi
+        release_info=$(curl -s "$api_url/tags/$(printf '%s' "$MODSHARP_RELEASE_TAG" | jq -sRr @uri)")
+    elif [ "${PRERELEASE:-0}" -eq 1 ]; then
         release_info=$(curl -s "$api_url" | jq '.[0] // empty')
     else
         release_info=$(curl -s "$api_url/latest")

@@ -14,7 +14,7 @@ update_counterstrikesharp() {
     rm -rf "$temp_dir"/*
 
     local release_info
-    release_info=$(get_github_release "$REPO" "-with-runtime-linux-.*\\.zip$")
+    release_info=$(get_github_release "$REPO" "-with-runtime-linux-.*\\.zip$" "${CSS_RELEASE_TAG:-}")
 
     # Validate JSON response
     if [ -z "$release_info" ] || ! echo "$release_info" | jq -e . >/dev/null 2>&1; then

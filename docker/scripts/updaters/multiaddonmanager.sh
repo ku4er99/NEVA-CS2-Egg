@@ -12,7 +12,7 @@ update_multiaddonmanager() {
     local release_info new_version asset_url asset_name current_version
     local work_dir archive extracted content_root backup_dir
 
-    release_info="$(get_github_release "$MAM_REPO" "(?i).*linux.*(\\.zip|\\.tar\\.gz)$")"
+    release_info="$(get_github_release "$MAM_REPO" "(?i).*linux.*(\\.zip|\\.tar\\.gz)$" "${MAM_RELEASE_TAG:-}")"
     if [ -z "$release_info" ] || ! echo "$release_info" | jq -e . >/dev/null 2>&1; then
         log_message "Failed to fetch MultiAddonManager release information" "error"
         return 1
