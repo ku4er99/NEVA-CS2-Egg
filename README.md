@@ -141,3 +141,7 @@ Build your own Docker image using the included build script:
 Distributed under the GPL-3.0 License. See `LICENSE.md` for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+NAP latest is resolved from GitHub on startup even if an old local archive path remains configured. Local release archives are optional for exact tags and do not require a SHA256 variable. Provisioning may resolve latest once to a concrete tag for consistent job retries; it must clear the previous local archive path.
+
+MultiAddonManager accepts Linux archives named steamrt3, including current upstream releases. steamrt4 is not selected for the steamrt64 CS2 image.

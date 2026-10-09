@@ -17,6 +17,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify addon updaters
+        run: |
+          bash docker/tests/release_freeze_test.sh
+          bash docker/tests/nap_release_test.sh
+          bash docker/tests/nap_sponsorboards_test.sh
+          bash docker/tests/multiaddonmanager_test.sh
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 

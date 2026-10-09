@@ -105,7 +105,9 @@ resolve_private_latest_asset() {
       log_error "RELEASE_FREEZE=1 requires NAP_RELEASE_TAG"
       return 1
     fi
-    release_path="tags/$(printf '%s' "$NAP_RELEASE_TAG" | jq -sRr @uri)"
+    if [[ "${NAP_RELEASE_TAG:-}" != "latest" ]]; then
+      release_path="tags/$(printf '%s' "$NAP_RELEASE_TAG" | jq -sRr @uri)"
+    fi
   fi
 
   require_cmd curl
@@ -307,16 +309,17 @@ update_nap() {
     return 1
   fi
 
+  # latest must use GitHub even when an old cache path remains configured.
+  if [[ "${NAP_RELEASE_TAG:-}" == "latest" ]]; then
+    NAP_LOCAL_ARCHIVE=""
+  fi
+
   if [[ -n "${NAP_LOCAL_ARCHIVE:-}" ]]; then
-    if [[ "$NAP_LOCAL_ARCHIVE" != /tmp/cs2_ds/.neva-releases/* || -z "${NAP_LOCAL_ARCHIVE_SHA256:-}" ]]; then
-      log_error "Local NAP archive must be in the read-only release cache and have a SHA-256 pin"
+    if [[ "$NAP_LOCAL_ARCHIVE" != /tmp/cs2_ds/.neva-releases/* || ! -f "$NAP_LOCAL_ARCHIVE" ]]; then
+      log_error "Local NAP archive must exist in the read-only release cache"
       return 1
     fi
-    if ! printf '%s  %s\n' "$NAP_LOCAL_ARCHIVE_SHA256" "$NAP_LOCAL_ARCHIVE" | sha256sum --check --status; then
-      log_error "Local NAP release checksum mismatch"
-      return 1
-    fi
-    release_key="${NAP_RELEASE_TAG}:${NAP_LOCAL_ARCHIVE_SHA256}"
+    release_key="${NAP_RELEASE_TAG}:local"
     current_version="$(get_current_version "NevaAdminPlugin")"
     if [[ "$current_version" == "$release_key" && -f "$dest/${PLUGIN_NAME}.dll" ]]; then
       write_nap_config "$dest"

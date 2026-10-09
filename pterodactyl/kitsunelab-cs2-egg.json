@@ -310,16 +310,6 @@
       "name": "Local NAP release archive",
       "env_variable": "NAP_LOCAL_ARCHIVE",
       "user_editable": false
-    },
-    {
-      "user_viewable": false,
-      "rules": "nullable|string|max:64",
-      "description": "Exact SHA-256 of the cached private release",
-      "default_value": "",
-      "field_type": "text",
-      "name": "Local NAP SHA-256",
-      "env_variable": "NAP_LOCAL_ARCHIVE_SHA256",
-      "user_editable": false
     }
   ]
 }
