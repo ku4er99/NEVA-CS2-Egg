@@ -49,6 +49,8 @@ jq() {
     esac
 }
 get_github_release() {
+    [[ "MultiAddonManager-v-fixture-steamrt3.tar.gz" =~ linux|steamrt3 ]]
+    [[ "$2" == *"steamrt3"* ]]
     printf '%s\n' '{"version":"v-test","asset_url":"https://example.invalid/mam.zip","asset_name":"MultiAddonManager-linux.zip"}'
 }
 handle_download_and_extract() {
