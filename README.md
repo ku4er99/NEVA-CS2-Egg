@@ -66,6 +66,7 @@ Each framework can be enabled/disabled independently via Pterodactyl panel. Auto
 ### Storage & Performance
 
 - **[VPK Sync](docs/features/vpk-sync.md)** → 80% storage & bandwidth reduction via centralized file sharing
+- **[Managed shared startup](docs/features/managed-startup.md)** → SMS maintenance lock before sync, verified shared builds without per-slot SteamCMD, bounded retries for ordinary installations
 - **Junk Cleaner** → Automatic cleanup (backups, logs, demos)
 
 ### Management & Configuration

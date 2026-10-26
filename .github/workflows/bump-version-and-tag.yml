@@ -8,7 +8,10 @@ permissions:
   contents: write
 
 jobs:
+  tests:
+    uses: ./.github/workflows/shell-tests.yml
   bump:
+    needs: tests
     # не запускаться на коммиты, которые сделал бот релиза
     if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, 'chore(release):')
     runs-on: ubuntu-latest

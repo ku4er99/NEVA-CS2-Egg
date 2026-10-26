@@ -1,0 +1,25 @@
+name: shell-tests
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: sudo apt-get update && sudo apt-get install -y jq rsync unzip zip shellcheck python3
+      - name: Check shell syntax
+        run: find docker -name '*.sh' -print0 | xargs -0 -n1 bash -n
+      - name: Check startup helpers
+        run: shellcheck -S warning -e SC1091 docker/scripts/steamcmd.sh docker/scripts/shared_install.sh docker/tests/startup_update_test.sh
+      - name: Run shell regressions
+        run: |
+          for test in docker/tests/*_test.sh; do
+            bash "$test"
+          done

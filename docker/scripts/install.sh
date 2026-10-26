@@ -1,5 +1,6 @@
 #!/bin/bash
 source /utils/logging.sh
+source /scripts/steamcmd.sh
 
 install_steamcmd() {
     if [ -f "./steamcmd/steamcmd.sh" ]; then
@@ -13,15 +14,14 @@ install_steamcmd() {
     local retry=0
 
     # Create necessary directories
-    mkdir -p ./steamcmd
-    mkdir -p ./steamapps
+    mkdir -p ./steamcmd ./steamapps || return $?
 
     # Download with retry
     while [ $retry -lt $max_retries ]; do
-        if curl -sSL --connect-timeout 30 --max-time 300 -o steamcmd.tar.gz "$STEAMCMD_URL"; then
+        if curl -fsSL --connect-timeout 30 --max-time 300 -o steamcmd.tar.gz "$STEAMCMD_URL"; then
             break
         fi
-        ((retry++))
+        retry=$((retry + 1))
         log_message "Download failed (attempt $retry/$max_retries)" "warning"
         sleep 5
     done
@@ -44,7 +44,7 @@ install_steamcmd() {
     fi
 
     # Initialize steamcmd
-    ./steamcmd/steamcmd.sh +quit
+    steamcmd_run_bounded bootstrap +quit || return $?
 
     # Set up 32-bit libraries
     mkdir -p ./.steam/sdk32

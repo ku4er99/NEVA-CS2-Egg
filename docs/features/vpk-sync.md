@@ -2,6 +2,10 @@
 
 Dramatically reduce storage and bandwidth by centralizing CS2 game files.
 
+For SMS-managed nodes using `/tmp/cs2_ds`, follow [Managed shared startup](managed-startup.md).
+Those nodes use the existing host maintenance lock and skip per-slot SteamCMD; the
+generic cron/update setup below is for other installations.
+
 ## Overview
 
 VPK Sync allows multiple CS2 servers to share game files from a single centralized location instead of each server storing its own complete copy.

@@ -39,7 +39,7 @@ sync_files() {
     fi
 
     local src_dir="${SYNC_LOCATION}"
-    local dest_dir="/home/container"
+    local dest_dir="${1:-/home/container}"
 
     # Make sure the source directory actually exists
     if [ ! -d "$src_dir" ]; then
@@ -55,7 +55,8 @@ sync_files() {
     # We'll symlink VPKs separately to save space
     # gameinfo.gi is excluded to preserve addon configurations
     local rsync_log="/tmp/vpk-sync-rsync.log"
-    if rsync -aKLz --exclude '.neva-releases/' --exclude '*.vpk' --exclude 'cfg/' --exclude 'game/csgo/gameinfo.gi' \
+    if rsync -aKLz --exclude '.neva-releases/' --exclude '.neva-maintenance/' --exclude '.neva-provisioned' \
+        --exclude '*.vpk' --exclude 'cfg/' --exclude 'game/csgo/gameinfo.gi' \
         "$src_dir/" "$dest_dir" 2>"$rsync_log"; then
         : # ok
     else
@@ -73,10 +74,8 @@ sync_files() {
     local gameinfo_dest="$dest_dir/game/csgo/gameinfo.gi"
     if [ -f "$gameinfo_src" ] && [ ! -f "$gameinfo_dest" ]; then
         if ! cp "$gameinfo_src" "$gameinfo_dest" 2>/tmp/vpk-sync-cp.log; then
-          log_message "Failed to copy initial gameinfo.gi" "warning"
-          tail -n 20 /tmp/vpk-sync-cp.log 2>/dev/null | while IFS= read -r line; do
-            log_message "$line" "warning"
-          done
+          log_message "Failed to copy initial gameinfo.gi; start rejected" "error"
+          return 1
         fi
         log_message "Copied initial gameinfo.gi" "debug"
     fi
@@ -85,33 +84,44 @@ sync_files() {
     # This is where we save the big bucks (~56GB of VPKs)
     local vpk_count=0
     local vpk_total_size=0
+    local vpk_list rel_path link_path file_size failed=0
+    vpk_list=$(mktemp) || return 1
+    if ! find "$src_dir" -type f -name "*.vpk" -print0 > "$vpk_list"; then
+        rm -f "$vpk_list"
+        log_message "Failed to enumerate VPK files; start rejected" "error"
+        return 1
+    fi
     while IFS= read -r -d '' vpk_file; do
         rel_path="${vpk_file#$src_dir/}"
         link_path="$dest_dir/$rel_path"
 
         # Make sure the directory exists before linking
-        mkdir -p "$(dirname "$link_path")" 2>/dev/null
+        if ! mkdir -p "$(dirname "$link_path")" 2>/dev/null; then
+            failed=1
+            break
+        fi
 
         # Determine file size
         file_size=$(stat -c %s "$vpk_file" 2>/dev/null || stat -f %z "$vpk_file" 2>/dev/null || echo 0)
         [[ "$file_size" =~ ^[0-9]+$ ]] || file_size=0
 
-        # Remove existing file/link if present
-        if [ -e "$link_path" ] || [ -L "$link_path" ]; then
-            rm -f "$link_path" 2>/dev/null
-        fi
-
-        # Create the symlink
-        if ln -sf "$vpk_file" "$link_path" 2>/dev/null; then
+        # Replace a file/link, never accidentally create a link inside a directory.
+        if ln -sfnT "$vpk_file" "$link_path" 2>/dev/null; then
             ((++vpk_count))
             vpk_total_size=$((vpk_total_size + file_size))
         else
-            log_message "Failed to link: $rel_path" "warning"
+            failed=1
+            break
         fi
-    done < <(find "$src_dir" -type f -name "*.vpk" -print0 2>/dev/null || true)
+    done < "$vpk_list"
+    rm -f "$vpk_list" || return 1
+    if [[ "$failed" == 1 ]]; then
+        log_message "Failed to link VPK files; start rejected" "error"
+        return 1
+    fi
 
     local human_total
-    human_total=$(format_bytes "$vpk_total_size")
+    human_total=$(format_bytes "$vpk_total_size") || return 1
     log_message "VPK sync complete — linked ${vpk_count} file(s), total VPK size ${human_total} (approx. per-server saving)" "success"
 
     return 0
@@ -124,7 +134,7 @@ sync_cfg_files() {
     fi
 
     local src_dir="${SYNC_LOCATION}"
-    local dest_dir="/home/container"
+    local dest_dir="${1:-/home/container}"
     local cfg_src_dir="$src_dir/game/csgo/cfg"
     local cfg_dest_dir="$dest_dir/game/csgo/cfg"
 
@@ -134,11 +144,18 @@ sync_cfg_files() {
     fi
 
     # Make sure the destination cfg dir exists
-    mkdir -p "$cfg_dest_dir" 2>/dev/null
+    mkdir -p "$cfg_dest_dir" 2>/dev/null || return 1
 
     # Copy default config files ONLY if they don't already exist
     # This way we don't overwrite user's custom configs
     local synced_count=0
+    local cfg_list filename dest_file failed=0
+    cfg_list=$(mktemp) || return 1
+    if ! find "$cfg_src_dir" -type f \( -name "*.cfg" -o -name "*.vcfg" \) -print0 > "$cfg_list"; then
+        rm -f "$cfg_list"
+        log_message "Failed to enumerate default configurations; start rejected" "error"
+        return 1
+    fi
     while IFS= read -r -d '' cfg_file; do
         filename="$(basename "$cfg_file")"
         dest_file="$cfg_dest_dir/$filename"
@@ -147,10 +164,16 @@ sync_cfg_files() {
             if cp "$cfg_file" "$dest_file" 2>/dev/null; then
                 ((++synced_count))
             else
-                log_message "Failed to copy: $filename" "warning"
+                failed=1
+                break
             fi
         fi
-    done < <(find "$cfg_src_dir" -type f \( -name "*.cfg" -o -name "*.vcfg" \) -print0 2>/dev/null || true)
+    done < "$cfg_list"
+    rm -f "$cfg_list" || return 1
+    if [[ "$failed" == 1 ]]; then
+        log_message "Failed to copy default configurations; start rejected" "error"
+        return 1
+    fi
 
     if [ $synced_count -gt 0 ]; then
         log_message "Synced $synced_count default config file(s)" "debug"
