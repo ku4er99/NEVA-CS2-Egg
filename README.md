@@ -50,7 +50,7 @@ The centralized update script automatically detects your OS version and installs
 **Multi-Framework Support** → Enable multiple frameworks simultaneously with independent boolean toggles. The egg automatically handles framework dependencies, load order, and gameinfo.gi configuration.
 
 - **[MetaMod:Source](https://www.metamodsource.net/downloads.php?branch=dev)** → Core plugin framework (required for CSS)
-- **[CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp)** → C# plugin framework with .NET 8 runtime
+- **[CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp)** → C# plugin framework with .NET 10 runtime
 - **[SwiftlyS2](https://github.com/swiftly-solution/swiftlys2)** → Standalone C# framework v2
 - **[ModSharp](https://github.com/Kxnrl/modsharp-public)** → Standalone C# platform with .NET 9 runtime
 
@@ -146,3 +146,10 @@ Distributed under the GPL-3.0 License. See `LICENSE.md` for more information.
 NAP latest is resolved from GitHub on startup even if an old local archive path remains configured. Local release archives are optional for exact tags and do not require a SHA256 variable. Provisioning may resolve latest once to a concrete tag for consistent job retries; it must clear the previous local archive path.
 
 MultiAddonManager accepts Linux archives named steamrt3, including current upstream releases. steamrt4 is not selected for the steamrt64 CS2 image.
+
+For CS2 1.41.9.7, CSS and MultiAddonManager are downloaded from the public
+`NaMol4anke/CounterStrikeSharp` and `NaMol4anke/MultiAddonManager` hotfix forks.
+Pin `CSS_RELEASE_TAG=v1.0.379-neva.2` and `MAM_RELEASE_TAG=v1.7.3-neva.2` in SMS
+provisioning settings, then use a rebuilt Egg image. See
+[hotfix release sources](docs/features/auto-updaters.md#cs2-14197-hotfix-sources)
+for configuration and validation.

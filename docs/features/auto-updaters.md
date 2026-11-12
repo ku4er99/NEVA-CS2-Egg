@@ -7,13 +7,42 @@ Automatically update MetaMod, CounterStrikeSharp, SwiftlyS2, and ModSharp on ser
 The egg includes automatic updaters for popular CS2 server plugins with **multi-framework support** → enable multiple frameworks simultaneously:
 
 - **MetaMod:Source** → Core plugin framework (required for CSS)
-- **CounterStrikeSharp (CSS)** → C# plugin framework (.NET 8)
+- **CounterStrikeSharp (CSS)** → C# plugin framework (.NET 10)
 - **SwiftlyS2** → Standalone C# framework v2 (no MetaMod required)
 - **ModSharp** → Standalone C# platform with .NET 9 runtime
 
 Updates happen automatically on server startup, keeping your plugins current without manual intervention.
 
 **Version Tracking:** All addon versions are stored in `/home/container/egg/versions.txt`
+
+## CS2 1.41.9.7 hotfix sources
+
+CSS downloads releases from [NaMol4anke/CounterStrikeSharp](https://github.com/NaMol4anke/CounterStrikeSharp/releases/tag/v1.0.379-neva.2).
+MultiAddonManager downloads releases from [NaMol4anke/MultiAddonManager](https://github.com/NaMol4anke/MultiAddonManager/releases/tag/v1.7.3-neva.2).
+Both community builds include the fixed SDK network-message layout; CSS also includes
+the Linux ClientPrint gamedata fix, and MAM includes the ReplyConnection signature fix.
+
+Configure exact tags in the SMS provisioning environment:
+
+```dotenv
+Provisioning__Environment__CSS_RELEASE_TAG=v1.0.379-neva.2
+Provisioning__Environment__MAM_RELEASE_TAG=v1.7.3-neva.2
+```
+
+SMS sets `RELEASE_FREEZE=1` and passes these tags to the Egg before starting a managed
+match. Do not use `latest` for these two settings: the current SMS resolver looks up
+`latest` in the upstream repositories, while these tags belong to the hotfix forks.
+Apply the SMS configuration and restart SMS so it loads the new settings.
+
+The updater scripts are copied into the Docker image. Build and publish the changed
+Egg, then set `Provisioning__DockerImage` to that image's new tag or immutable digest.
+Changing the panel Egg JSON or release tags alone does not replace the updater scripts.
+Keep `INSTALL_CSS=1`, `NAP_ENABLED=1`, and `INSTALL_MULTIADDONMANAGER=1` when using boards.
+CSS selects the Linux with-runtime ZIP; MAM selects the SteamRT3 tarball.
+
+Validate a test slot through the normal SMS match startup, including player joins,
+Workshop downloads, NAP, board rendering, reconnects, map changes, warmup and live rounds.
+Successful package builds do not establish match readiness.
 
 ## Configuration
 
@@ -125,7 +154,7 @@ Game_LowViolence    csgo_lv
 
 1. Checks if MetaMod enabled (auto-enables with warning if not)
 2. Checks current CSS version
-3. Fetches latest release from roflmuffin/CounterStrikeSharp
+3. Fetches the pinned release from NaMol4anke/CounterStrikeSharp when `RELEASE_FREEZE=1`, otherwise the latest release from that fork
 4. Downloads with-runtime Linux build
 5. Extracts and updates version tracking
 
@@ -343,7 +372,7 @@ curl -I https://www.metamodsource.net/downloads.php?branch=dev
 **Common error:**
 
 ```
-[ERROR] No suitable asset found for roflmuffin/CounterStrikeSharp
+[ERROR] No suitable asset found for NaMol4anke/CounterStrikeSharp
 ```
 
 **Solution:** GitHub API rate limit → wait 1 hour or check network access
