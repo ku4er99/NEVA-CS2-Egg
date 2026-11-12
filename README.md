@@ -145,6 +145,13 @@ Distributed under the GPL-3.0 License. See `LICENSE.md` for more information.
 
 NAP latest is resolved from GitHub on startup even if an old local archive path remains configured. Local release archives are optional for exact tags and do not require a SHA256 variable. Provisioning may resolve latest once to a concrete tag for consistent job retries; it must clear the previous local archive path.
 
+Addon startup checks the requested GitHub release first. If the API is unavailable,
+the server can continue with a recorded local version whose required runtime files
+are present and non-empty. An absent or incomplete local installation stops startup.
+Fallback logs both the requested and installed versions; it may temporarily use an
+older local version even when an exact release is pinned. See
+[GitHub outage behavior](docs/features/auto-updaters.md#github-api-outages).
+
 MultiAddonManager accepts Linux archives named steamrt3, including current upstream releases. steamrt4 is not selected for the steamrt64 CS2 image.
 
 For CS2 1.41.9.7, CSS and MultiAddonManager are downloaded from the public

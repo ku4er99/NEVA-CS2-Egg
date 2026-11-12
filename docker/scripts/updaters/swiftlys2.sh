@@ -15,7 +15,12 @@ update_swiftly() {
     rm -rf "$temp_dir"/*
 
     local release_info
-    release_info=$(get_github_release "$REPO" "linux.*with-runtimes\\.zip" "${SWIFTLY_RELEASE_TAG:-}")
+    if release_info=$(get_github_release "$REPO" "linux.*with-runtimes\\.zip" "${SWIFTLY_RELEASE_TAG:-}"); then
+        :
+    else
+        use_installed_addon "$?" "Swiftly" "${SWIFTLY_RELEASE_TAG:-latest}"
+        return $?
+    fi
 
     # Validate JSON response
     if [ -z "$release_info" ] || ! echo "$release_info" | jq -e . >/dev/null 2>&1; then
@@ -29,18 +34,18 @@ update_swiftly() {
 
     if [ -z "$new_version" ]; then
         log_message "Failed to get version for $REPO" "error"
-        return 0
+        return 1
     fi
 
     # Check if update needed
-    if [ "$current_version" = "$new_version" ]; then
+    if [ "$current_version" = "$new_version" ] && addon_files_present "Swiftly"; then
         log_message "SwiftlyS2 is up-to-date ($current_version)" "info"
         return 0
     fi
 
     if [ -z "$asset_url" ]; then
         log_message "No suitable asset found for $REPO" "error"
-        return 0
+        return 1
     fi
 
     log_message "Update available for SwiftlyS2: $new_version (current: ${current_version:-none})" "info"
@@ -49,17 +54,17 @@ update_swiftly() {
         # Find swiftlys2 directory (handles versioned top-level folders)
         local swiftly_dir=$(find "$temp_dir" -type d -name "swiftlys2" -path "*/addons/swiftlys2" | head -n1)
 
-        if [ -n "$swiftly_dir" ] && [ -d "$swiftly_dir" ]; then
+        if [ -n "$swiftly_dir" ] && addon_files_present "Swiftly" "$(dirname "$swiftly_dir")"; then
             local target_dir="$OUTPUT_DIR/swiftlys2"
 
             if [ -d "$target_dir" ]; then
                 # Update: only overwrite bin/ and gamedata/ (preserve user configs and plugins)
-                cp -rf "$swiftly_dir/bin" "$target_dir/" && \
-                cp -rf "$swiftly_dir/gamedata" "$target_dir/" && \
+                cp -rf "$swiftly_dir/bin" "$target_dir/" || return 1
+                cp -rf "$swiftly_dir/gamedata" "$target_dir/" || return 1
                 log_message "SwiftlyS2 updated to $new_version (bin + gamedata)" "success"
             else
                 # Fresh install: copy everything
-                cp -rn "$swiftly_dir" "$OUTPUT_DIR/" && \
+                cp -rn "$swiftly_dir" "$OUTPUT_DIR/" || return 1
                 log_message "SwiftlyS2 installed $new_version" "success"
             fi
 

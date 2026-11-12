@@ -5,38 +5,149 @@
 VERSION_FILE="${EGG_DIR:-/home/container/egg}/versions.txt"
 TEMP_DIR="./temps"
 
-# Get GitHub release info (supports prerelease via PRERELEASE env var)
-# Outputs JSON: {version, asset_url, asset_name, is_prerelease}
-get_github_release() {
+# Read a release document. Exit 2 denotes invalid configuration, not an outage.
+get_github_release_document() {
     local repo="$1"
-    local asset_pattern="${2:-.*}"
-    local pinned_tag="${3:-}"
+    local pinned_tag="${2:-}"
+    local token="${3:-}"
+    local tag_prefix="${4:-}"
+    local required_asset="${5:-}"
     local url="https://api.github.com/repos/$repo/releases"
+    local response status response_headers http_status reset
+    local -a headers=()
 
-    # Select endpoint based on prerelease setting (log to stderr to not pollute output)
-    if [ "${RELEASE_FREEZE:-0}" = "1" ]; then
-        if [ -z "$pinned_tag" ]; then
-            log_message "RELEASE_FREEZE=1 requires a pinned release tag for $repo" "error" >&2
-            return 1
-        fi
+    if [ "${RELEASE_FREEZE:-0}" = "1" ] && [ -z "$pinned_tag" ]; then
+        log_message "RELEASE_FREEZE=1 requires a pinned release tag for $repo" "error" >&2
+        return 2
+    fi
+    if [ -n "$pinned_tag" ] && [ "$pinned_tag" != "latest" ]; then
         url="$url/tags/$(printf '%s' "$pinned_tag" | jq -sRr @uri)"
         log_message "Using pinned release $pinned_tag for $repo" "debug" >&2
-    elif [ "${PRERELEASE:-0}" = "1" ]; then
+    elif [ -n "$tag_prefix" ] || { [ "$pinned_tag" != "latest" ] && [ "${PRERELEASE:-0}" = "1" ]; }; then
         log_message "Checking releases (prereleases enabled) for $repo" "debug" >&2
     else
         url="$url/latest"
         log_message "Checking latest stable release for $repo" "debug" >&2
     fi
 
-    curl -s "$url" 2>/dev/null | jq --arg p "$asset_pattern" '
-        (if type == "array" then .[0] else . end) //empty |
+    [ -z "$token" ] || headers=(-H "Authorization: Bearer ${token}")
+    response_headers="$(mktemp)" || return 1
+    # Never print credentials, response bodies or curl's command line on failure.
+    if response="$(curl -4 -fsSL --connect-timeout 5 --max-time 15 -D "$response_headers" \
+        "${headers[@]}" -H 'Accept: application/vnd.github+json' "$url" 2>/dev/null)"; then
+        :
+    else
+        status=$?
+        http_status="$(awk '/^HTTP\// {status=$2} END {print status}' "$response_headers")"
+        reset="$(awk 'tolower($1) == "x-ratelimit-reset:" {gsub(/\r/, "", $2); print $2}' "$response_headers")"
+        rm -f "$response_headers"
+        log_message "GitHub release API failed for $repo (HTTP ${http_status:-unavailable}, curl exit $status, rate-limit reset ${reset:-unknown})" "warning" >&2
+        return 1
+    fi
+    rm -f "$response_headers"
+    if ! printf '%s' "$response" | jq -ce --arg prefix "$tag_prefix" --arg asset "$required_asset" '
+        def usable: select(.tag_name? | type == "string") |
+            select(.tag_name | startswith($prefix)) |
+            select($asset == "" or any(.assets[]?; .name? | strings | test($asset)));
+        (if type == "array" then map(usable) | .[0] else . end) |
+        select(type == "object") |
+        select((.tag_name | type == "string" and length > 0) and (.assets | type == "array")) |
+        usable
+    ' 2>/dev/null; then
+        log_message "GitHub release API returned invalid metadata for $repo" "warning" >&2
+        return 1
+    fi
+}
+
+# Outputs JSON: {version, asset_url, asset_name, is_prerelease}.
+get_github_release() {
+    local repo="$1" asset_pattern="${2:-.*}" pinned_tag="${3:-}"
+    local document status
+    if document="$(get_github_release_document "$repo" "$pinned_tag")"; then
+        :
+    else
+        status=$?
+        return "$status"
+    fi
+    if ! printf '%s' "$document" | jq -ce --arg p "$asset_pattern" '
         {
             version: .tag_name,
             is_prerelease: .prerelease,
             asset_url: (first(.assets[] | select(.name | test($p)) | .browser_download_url) // ""),
             asset_name: (first(.assets[] | select(.name | test($p)) | .name) // "")
-        }
-    ' 2>/dev/null
+        } | select(.asset_url != "" and .asset_name != "")
+    ' 2>/dev/null; then
+        log_message "GitHub release has no usable asset for $repo" "warning" >&2
+        return 1
+    fi
+}
+
+has_nonempty_file() {
+    local path
+    for path in "$@"; do
+        if [ -f "$path" ] && [ -s "$path" ]; then return 0; fi
+    done
+    return 1
+}
+
+nonempty_files() {
+    local path
+    for path in "$@"; do
+        [ -f "$path" ] && [ -s "$path" ] || return 1
+    done
+}
+
+dotnet_runtime_files_present() {
+    local root="$1"
+    has_nonempty_file "$root"/host/fxr/*/libhostfxr.so &&
+    has_nonempty_file "$root"/shared/Microsoft.NETCore.App/*/libcoreclr.so &&
+    has_nonempty_file "$root"/shared/Microsoft.NETCore.App/*/libhostpolicy.so
+}
+
+# A version marker alone (or an empty installation directory) is not runnable.
+addon_files_present() {
+    local addon="$1" root="${2:-./game/csgo/addons}"
+    case "$addon" in
+        Metamod)
+            nonempty_files "$root/metamod/bin/linuxsteamrt64/libserver.so" \
+                "$root/metamod/bin/linuxsteamrt64/metamod.2.cs2.so" ;;
+        CSS)
+            nonempty_files "$root/counterstrikesharp/bin/linuxsteamrt64/counterstrikesharp.so" \
+                "$root/counterstrikesharp/api/CounterStrikeSharp.API.dll" \
+                "$root/counterstrikesharp/api/CounterStrikeSharp.API.runtimeconfig.json" \
+                "$root/metamod/counterstrikesharp.vdf" &&
+            dotnet_runtime_files_present "$root/counterstrikesharp/dotnet" ;;
+        MultiAddonManager)
+            has_nonempty_file "$root/multiaddonmanager/bin/multiaddonmanager.so" \
+                "$root/multiaddonmanager/bin/linuxsteamrt64/multiaddonmanager.so" &&
+            nonempty_files "$root/metamod/multiaddonmanager.vdf" ;;
+        NevaAdminPlugin)
+            nonempty_files "$root/counterstrikesharp/plugins/NEVA.CS2.NevaAdminPlugin/NEVA.CS2.NevaAdminPlugin.dll" \
+                "$root/counterstrikesharp/plugins/NEVA.CS2.NevaAdminPlugin/NEVA.CS2.NevaAdminPlugin.deps.json" ;;
+        Swiftly)
+            nonempty_files "$root/swiftlys2/bin/linuxsteamrt64/libserver.so" \
+                "$root/swiftlys2/bin/linuxsteamrt64/swiftlys2.so" \
+                "$root/swiftlys2/bin/linuxsteamrt64/libhostfxr.so" \
+                "$root/swiftlys2/bin/managed/SwiftlyS2.Core.dll" &&
+            dotnet_runtime_files_present "$root/swiftlys2/bin/managed/dotnet" ;;
+        ModSharp)
+            nonempty_files ./game/sharp/bin/linuxsteamrt64/libserver.so \
+                ./game/sharp/bin/libmodsharp.so ./game/sharp/core/Sharp.Core.dll \
+                ./game/sharp/runtime/dotnet && dotnet_runtime_files_present ./game/sharp/runtime ;;
+        *) return 1 ;;
+    esac
+}
+
+use_installed_addon() {
+    local status="$1" addon="$2" requested="${3:-latest}" current
+    [ "$status" -ne 2 ] || return 1
+    current="$(get_current_version "$addon")"
+    if [ -n "$current" ] && addon_files_present "$addon" "${4:-./game/csgo/addons}"; then
+        log_message "GitHub unavailable for $addon (requested ${requested:-latest}); using installed $current" "warning"
+        return 0
+    fi
+    log_message "GitHub unavailable for $addon and no complete recorded local installation is available" "error"
+    return 1
 }
 
 # Get current version from version file
@@ -88,7 +199,7 @@ handle_download_and_extract() {
         if curl -4 -fsSL --connect-timeout 15 -o "$output_file" "$url"; then
             break
         fi
-        ((retry++))
+        retry=$((retry + 1))
         log_message "Download failed (attempt $retry/$max_retries)" "warning"
         sleep 5
     done

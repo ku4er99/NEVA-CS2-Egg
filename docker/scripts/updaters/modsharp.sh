@@ -17,7 +17,8 @@ install_dotnet_runtime() {
     local current_dotnet_version=$(get_current_version "DotNet")
 
     # Check if runtime is up to date
-    if [ "$current_dotnet_version" = "$dotnet_version" ] && [ -f "$runtime_dir/dotnet" ]; then
+    if [ "$current_dotnet_version" = "$dotnet_version" ] && \
+       nonempty_files "$runtime_dir/dotnet" && dotnet_runtime_files_present "$runtime_dir"; then
         log_message ".NET runtime already up to date: $dotnet_version" "debug"
         return 0
     fi
@@ -32,6 +33,10 @@ install_dotnet_runtime() {
     local download_file="$TEMP_DIR/dotnet-runtime.tar.gz"
 
     if handle_download_and_extract "$dotnet_url" "$download_file" "$runtime_dir" "tar.gz"; then
+        if ! nonempty_files "$runtime_dir/dotnet" || ! dotnet_runtime_files_present "$runtime_dir"; then
+            log_message ".NET archive has an incomplete runtime" "error"
+            return 1
+        fi
         update_version_file "DotNet" "$dotnet_version"
         log_message ".NET $dotnet_version runtime installed successfully" "success"
         rm -f "$download_file"
@@ -58,27 +63,15 @@ download_and_extract() {
 
 # Main update function
 update_modsharp() {
-    # Step 1: Install/update .NET runtime
-    if ! install_dotnet_runtime; then
-        log_message "Failed to install .NET runtime, aborting ModSharp update" "error"
-        return 1
-    fi
-
-    # Step 2: Get release info (direct API call for multiple assets)
+    # Resolve before touching the installed runtime, so an API outage is read-only.
     local repo="Kxnrl/modsharp-public"
-    local api_url="https://api.github.com/repos/$repo/releases"
     local release_info
 
-    if [ "${RELEASE_FREEZE:-0}" = "1" ]; then
-        if [ -z "${MODSHARP_RELEASE_TAG:-}" ]; then
-            log_message "RELEASE_FREEZE=1 requires MODSHARP_RELEASE_TAG" "error"
-            return 1
-        fi
-        release_info=$(curl -s "$api_url/tags/$(printf '%s' "$MODSHARP_RELEASE_TAG" | jq -sRr @uri)")
-    elif [ "${PRERELEASE:-0}" -eq 1 ]; then
-        release_info=$(curl -s "$api_url" | jq '.[0] // empty')
+    if release_info="$(get_github_release_document "$repo" "${MODSHARP_RELEASE_TAG:-}")"; then
+        :
     else
-        release_info=$(curl -s "$api_url/latest")
+        use_installed_addon "$?" "ModSharp" "${MODSHARP_RELEASE_TAG:-latest}"
+        return $?
     fi
 
     if [ -z "$release_info" ] || ! echo "$release_info" | jq -e . >/dev/null 2>&1; then
@@ -101,12 +94,18 @@ update_modsharp() {
     log_message "Current version: ${current_version:-none}" "debug"
     log_message "Latest version: $latest_version" "debug"
 
-    if [ "$current_version" = "$latest_version" ] && [ -d "$MODSHARP_DIR" ]; then
+    if [ "$current_version" = "$latest_version" ] && addon_files_present "ModSharp" && \
+       [ "$(get_current_version DotNet)" = "$DOTNET_VERSION" ]; then
         log_message "ModSharp is up-to-date ($current_version)" "info"
         return 0
     fi
 
     log_message "Update available: $latest_version (current: ${current_version:-none})" "info"
+
+    if ! install_dotnet_runtime; then
+        log_message "Failed to install .NET runtime, aborting ModSharp update" "error"
+        return 1
+    fi
 
     # Step 3: Backup core.json if exists
     if [ -f "/home/container/sharp/configs/core.json" ]; then
@@ -135,6 +134,10 @@ update_modsharp() {
     fi
 
     # Step 8: Update version file
+    if ! addon_files_present "ModSharp"; then
+        log_message "ModSharp installation has incomplete runtime files" "error"
+        return 1
+    fi
     update_version_file "ModSharp" "$latest_version"
 
     log_message "ModSharp updated to $latest_version" "success"

@@ -7,17 +7,14 @@ source /utils/updater_common.sh
 
 get_metamod_release() {
     local repo="alliedmodders/metamod-source"
-    local api_url="https://api.github.com/repos/${repo}/releases"
-
-    if [ "${RELEASE_FREEZE:-0}" = "1" ]; then
-        if [ -z "${METAMOD_RELEASE_TAG:-}" ]; then
-            log_message "RELEASE_FREEZE=1 requires METAMOD_RELEASE_TAG" "error" >&2
-            return 1
-        fi
-        api_url="${api_url}/tags/$(printf '%s' "$METAMOD_RELEASE_TAG" | jq -sRr @uri)"
+    local document status
+    if document="$(get_github_release_document "$repo" "${METAMOD_RELEASE_TAG:-}" "" "2.0." '^mmsource-.*-linux\.tar\.gz$')"; then
+        :
+    else
+        status=$?
+        return "$status"
     fi
-
-    curl -4 -fsSL --connect-timeout 15 --max-time 60 "$api_url" 2>/dev/null | jq -r '
+    printf '%s' "$document" | jq -er '
         (if type == "array" then . else [.] end) |
         [
             .[]
@@ -43,6 +40,7 @@ get_metamod_release() {
             | select(.asset_url != "")
         ]
         | first
+        | select(. != null)
         | @base64
     '
 }
@@ -55,7 +53,12 @@ update_metamod() {
     fi
 
     local release_b64
-    release_b64="$(get_metamod_release)"
+    if release_b64="$(get_metamod_release)"; then
+        :
+    else
+        use_installed_addon "$?" "Metamod" "${METAMOD_RELEASE_TAG:-latest}"
+        return $?
+    fi
 
     if [ -z "$release_b64" ] || [ "$release_b64" = "null" ]; then
         log_message "Failed to fetch Metamod release from GitHub" "error"
@@ -80,7 +83,7 @@ update_metamod() {
     fi
 
     local new_version
-    new_version="$(echo "$asset_name" | grep -oP 'git\d+' || true)"
+    new_version="$(echo "$asset_name" | grep -oE 'git[0-9]+' || true)"
 
     if [ -z "$new_version" ]; then
         new_version="$github_tag"
@@ -89,7 +92,7 @@ update_metamod() {
     local current_version
     current_version="$(get_current_version "Metamod")"
 
-    if [ "$current_version" = "$new_version" ]; then
+    if [ "$current_version" = "$new_version" ] && addon_files_present "Metamod"; then
         log_message "Metamod is up-to-date ($current_version)" "info"
         return 0
     fi
@@ -103,13 +106,13 @@ update_metamod() {
     rm -f "$TEMP_DIR/metamod.tar.gz"
 
     if handle_download_and_extract "$full_url" "$TEMP_DIR/metamod.tar.gz" "$TEMP_DIR/metamod" "tar.gz"; then
-        if [ ! -d "$TEMP_DIR/metamod/addons" ]; then
+        if ! addon_files_present "Metamod" "$TEMP_DIR/metamod/addons"; then
             log_message "Metamod archive does not contain addons directory" "error"
             return 1
         fi
 
-        cp -rf "$TEMP_DIR/metamod/addons/." "$OUTPUT_DIR/" && \
-        update_version_file "Metamod" "$new_version" && \
+        cp -rf "$TEMP_DIR/metamod/addons/." "$OUTPUT_DIR/" || return 1
+        update_version_file "Metamod" "$new_version" || return 1
         log_message "Metamod updated to $new_version from GitHub release $github_tag" "success"
         return 0
     fi

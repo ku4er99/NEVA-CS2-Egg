@@ -97,52 +97,17 @@ resolve_private_latest_asset() {
   local repo="$1"
   local asset_name="$2"
   local token="$3"
-  local release_json
-  local release_path="latest"
-
-  if [[ "${RELEASE_FREEZE:-0}" == "1" ]]; then
-    if [[ -z "${NAP_RELEASE_TAG:-}" ]]; then
-      log_error "RELEASE_FREEZE=1 requires NAP_RELEASE_TAG"
-      return 1
-    fi
-    if [[ "${NAP_RELEASE_TAG:-}" != "latest" ]]; then
-      release_path="tags/$(printf '%s' "$NAP_RELEASE_TAG" | jq -sRr @uri)"
-    fi
+  local release_json status
+  if release_json="$(get_github_release_document "$repo" "${NAP_RELEASE_TAG:-latest}" "$token")"; then
+    :
+  else
+    status=$?
+    return "$status"
   fi
-
-  require_cmd curl
-  require_cmd python3
-
-  release_json="$(mktemp)"
-  if ! curl -4 -fsSL \
-    --connect-timeout 15 --max-time 60 \
-    --retry 3 --retry-delay 2 --retry-max-time 120 --retry-all-errors \
-    -H "Authorization: Bearer ${token}" \
-    -H "Accept: application/vnd.github+json" \
-    -o "$release_json" \
-    "https://api.github.com/repos/${repo}/releases/${release_path}"; then
-    rm -f "$release_json"
-    return 1
-  fi
-
-  python3 - "$release_json" "$asset_name" <<'PY'
-import json
-import sys
-
-with open(sys.argv[1], encoding="utf-8") as f:
-    release = json.load(f)
-
-asset_name = sys.argv[2]
-asset = next((item for item in release.get("assets", [])
-              if item.get("name") == asset_name), None)
-if not asset or not release.get("tag_name") or not asset.get("id"):
-    raise SystemExit(1)
-
-print(f"{release['tag_name']}\t{asset['id']}")
-PY
-  local status=$?
-  rm -f "$release_json"
-  return "$status"
+  printf '%s' "$release_json" | jq -er --arg asset "$asset_name" '
+    .tag_name as $tag | first(.assets[] | select(.name == $asset and (.id | type == "number"))) |
+    [$tag, (.id | tostring)] | @tsv
+  '
 }
 
 download_with_token_header() {
@@ -273,7 +238,7 @@ update_nap() {
   CSS_PLUGINS_DIR="$(find_css_plugins_dir || true)"
   if [[ -z "${CSS_PLUGINS_DIR:-}" ]]; then
     log_warning "CounterStrikeSharp plugins dir not found. Is CSS installed/enabled?"
-    return 0
+    return 1
   fi
 
   # Check unzip
@@ -291,12 +256,13 @@ update_nap() {
   trap "rm -rf '$tmpdir'" RETURN
 
   # Decide what to download
-  local asset_name token repo url dest release_info release_tag asset_id release_key current_version
+  local asset_name token repo url dest release_info release_tag asset_id release_key current_version addon_root
   asset_name="${NAP_ASSET:-$ASSET_DEFAULT}"
   token="${NAP_GH_TOKEN:-}"
   repo="${NAP_GH_REPO:-}"
   url="${NAP_ZIP_URL:-}"
   dest="${CSS_PLUGINS_DIR}/${PLUGIN_NAME}"
+  addon_root="$(dirname "$(dirname "$CSS_PLUGINS_DIR")")"
 
   # Runtime configuration (including SponsorBoards placements) lives under
   # addons/counterstrikesharp/configs, outside this DLL deployment directory.
@@ -321,7 +287,7 @@ update_nap() {
     fi
     release_key="${NAP_RELEASE_TAG}:local"
     current_version="$(get_current_version "NevaAdminPlugin")"
-    if [[ "$current_version" == "$release_key" && -f "$dest/${PLUGIN_NAME}.dll" ]]; then
+    if [[ "$current_version" == "$release_key" ]] && addon_files_present "NevaAdminPlugin" "$addon_root"; then
       write_nap_config "$dest"
       return 0
     fi
@@ -336,8 +302,7 @@ update_nap() {
   if [[ -z "${NAP_LOCAL_ARCHIVE:-}" && -n "$url" ]]; then
     log_running "Downloading (direct URL): ${url}"
     if ! download_with_token_header "$url" "$token" "$zipfile"; then
-      if [[ -d "$dest" ]]; then
-        log_warning "Download failed; keeping the currently installed plugin."
+      if use_installed_addon 1 "NevaAdminPlugin" "${NAP_RELEASE_TAG:-latest}" "$addon_root"; then
         write_nap_config "$dest"
         return 0
       fi
@@ -347,12 +312,13 @@ update_nap() {
   elif [[ -z "${NAP_LOCAL_ARCHIVE:-}" ]]; then
     if [[ -z "$repo" ]]; then
       log_warning "NAP_GH_REPO is empty and NAP_ZIP_URL not set. Can't download."
-      return 0
+      return 1
     fi
     log_running "Resolving latest release via GitHub API: ${repo}"
-    if ! release_info="$(resolve_private_latest_asset "$repo" "$asset_name" "$token")"; then
-      if [[ -d "$dest" ]]; then
-        log_warning "Could not resolve the latest release; keeping the currently installed plugin."
+    if release_info="$(resolve_private_latest_asset "$repo" "$asset_name" "$token")"; then
+      :
+    else
+      if use_installed_addon "$?" "NevaAdminPlugin" "${NAP_RELEASE_TAG:-latest}" "$addon_root"; then
         write_nap_config "$dest"
         return 0
       fi
@@ -368,7 +334,7 @@ update_nap() {
 
     release_key="${release_tag}:${asset_id}"
     current_version="$(get_current_version "NevaAdminPlugin")"
-    if [[ "$current_version" == "$release_key" && -d "$dest" ]]; then
+    if [[ "$current_version" == "$release_key" ]] && addon_files_present "NevaAdminPlugin" "$addon_root"; then
       log_success "Already up to date (${release_tag}, asset id=${asset_id}); skipping download."
       write_nap_config "$dest"
       return 0
@@ -376,8 +342,7 @@ update_nap() {
 
     log_running "Downloading asset '${asset_name}' (tag=${release_tag}, id=${asset_id})"
     if ! download_private_latest_asset "$repo" "$asset_id" "$token" "$zipfile"; then
-      if [[ -d "$dest" ]]; then
-        log_warning "Download failed; keeping the currently installed plugin (${current_version:-unknown version})."
+      if use_installed_addon 1 "NevaAdminPlugin" "${NAP_RELEASE_TAG:-latest}" "$addon_root"; then
         write_nap_config "$dest"
         return 0
       fi
@@ -388,7 +353,7 @@ update_nap() {
 
   # Unpack
   log_running "Unpacking zip"
-  unzip -oq "$zipfile" -d "$tmpdir/unpacked"
+  unzip -oq "$zipfile" -d "$tmpdir/unpacked" || return 1
 
   # Determine content root (zip may contain PLUGIN_NAME/...)
   local src
@@ -397,11 +362,16 @@ update_nap() {
     src="$tmpdir/unpacked/$PLUGIN_NAME"
   fi
 
+  if ! nonempty_files "$src/${PLUGIN_NAME}.dll" "$src/${PLUGIN_NAME}.deps.json"; then
+    log_error "Downloaded NAP archive has an incomplete plugin; existing installation was kept."
+    return 1
+  fi
+
   log_running "Installing to: ${dest}"
 
   rm -rf "$dest"
   mkdir -p "$dest"
-  cp -a "$src/." "$dest/"
+  cp -a "$src/." "$dest/" || return 1
   
     # --------------------------------------------------------------------------
   # config: write config.json if NAP_JSON_CONF contains JSON

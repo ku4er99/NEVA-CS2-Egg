@@ -17,17 +17,14 @@ NAP_LOCAL_ARCHIVE=/tmp/cs2_ds/.neva-releases/stale.zip
 # Assert actual API route and return an up-to-date fixture release, avoiding network.
 curl() {
   test "${*: -1}" = "https://api.github.com/repos/fixture/nap/releases/latest"
-  local out="" previous="" arg
-  for arg in "$@"; do
-    if [[ "$previous" == "-o" ]]; then out="$arg"; fi
-    previous="$arg"
-  done
-  printf '%s' '{"tag_name":"v-fixture","assets":[{"name":"NEVA.CS2.NevaAdminPlugin-linux-x64.zip","id":123}]}' > "$out"
+  printf '%s' '{"tag_name":"v-fixture","assets":[{"name":"NEVA.CS2.NevaAdminPlugin-linux-x64.zip","id":123}]}'
 }
 get_current_version() { printf '%s' 'v-fixture:123'; }
 write_nap_config() { :; }
 write_sponsorboards_placements() { :; }
 mkdir -p "./game/csgo/addons/counterstrikesharp/plugins/NEVA.CS2.NevaAdminPlugin"
+printf plugin > "./game/csgo/addons/counterstrikesharp/plugins/NEVA.CS2.NevaAdminPlugin/NEVA.CS2.NevaAdminPlugin.dll"
+printf deps > "./game/csgo/addons/counterstrikesharp/plugins/NEVA.CS2.NevaAdminPlugin/NEVA.CS2.NevaAdminPlugin.deps.json"
 update_nap
 test -z "$NAP_LOCAL_ARCHIVE"
 # Exact local releases need no checksum and compare by release tag.

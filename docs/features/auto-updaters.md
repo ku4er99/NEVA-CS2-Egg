@@ -15,6 +15,45 @@ Updates happen automatically on server startup, keeping your plugins current wit
 
 **Version Tracking:** All addon versions are stored in `/home/container/egg/versions.txt`
 
+## GitHub API outages
+
+At each start, enabled addon updaters check the requested release on GitHub. An
+explicit tag selects that release, and `latest` selects the latest release endpoint.
+Without a tag, the existing stable/prerelease policy applies; Metamod selects a
+2.0 release with a Linux archive. `RELEASE_FREEZE=1` still requires a release tag.
+
+- If the returned version matches a complete local installation, no archive is downloaded.
+- If the version changed, or required local files are missing, the updater installs
+  the returned release and records its version after the copy succeeds.
+- If the release API fails (including HTTP403/429/5xx, timeout, or unusable metadata),
+  startup continues only with a non-empty recorded version and the required non-empty
+  runtime files. The warning names the addon, requested release and installed version.
+- Without a complete recorded local installation, the failure stops startup.
+
+This behavior covers Metamod, CounterStrikeSharp, MultiAddonManager,
+NevaAdminPlugin, SwiftlyS2 and ModSharp. It does not turn off updates: the next
+startup tries GitHub again. An outage may temporarily retain an older version than
+an exact pin. Missing mandatory configuration, such as a frozen tag or the private
+NAP credential, remains an error.
+
+Local validation checks the core native/managed binaries and loader files, not just
+an addon directory: CSS includes its .NET host/runtime and API files, MAM includes
+its Metamod VDF, and NAP includes its DLL and dependency manifest. This detects
+missing or empty files; it is not a cryptographic integrity or gameplay compatibility
+check. NAP runtime config and SponsorBoards placements are still refreshed on fallback.
+
+Metadata requests have a 5-second connection timeout and a 15-second total timeout
+per enabled addon, with no repeated API request on rate-limit errors. HTTP status,
+curl status and the rate-limit reset timestamp are logged when available; tokens
+and API response bodies are not logged. API failure leaves installed files and
+version markers unchanged. Archive download/extraction and installation failures
+remain errors; NAP can also retain its complete existing installation after an
+asset download failure, before replacing any plugin files.
+
+`docker/tests/github_outage_test.sh` verifies outage fallback, absent/incomplete
+installations, healthy version checks, upgrades, pinned/latest routes, private-token
+redaction and the combined Metamod/MAM/CSS/NAP startup under strict Bash error handling.
+
 ## CS2 1.41.9.7 hotfix sources
 
 CSS downloads releases from [NaMol4anke/CounterStrikeSharp](https://github.com/NaMol4anke/CounterStrikeSharp/releases/tag/v1.0.379-neva.2).
@@ -525,7 +564,9 @@ A: Toggle off CSS checkbox, keep MetaMod enabled.
 A: No, only stable releases from official repos.
 
 **Q: What if GitHub is down?**
-A: Updates will fail, but server will start anyway. Updates will work on next restart.
+A: Startup uses a complete recorded local addon installation and logs a warning.
+Without the required local runtime files it stops with an error. See
+[GitHub API outages](#github-api-outages).
 
 **Q: Can I auto-update custom plugins?**
 A: Not built-in. You'll need to modify update scripts or manage them manually.

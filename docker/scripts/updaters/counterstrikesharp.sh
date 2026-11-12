@@ -14,7 +14,12 @@ update_counterstrikesharp() {
     rm -rf "$temp_dir"/*
 
     local release_info
-    release_info=$(get_github_release "$REPO" "-with-runtime-linux-.*\\.zip$" "${CSS_RELEASE_TAG:-}")
+    if release_info=$(get_github_release "$REPO" "-with-runtime-linux-.*\\.zip$" "${CSS_RELEASE_TAG:-}"); then
+        :
+    else
+        use_installed_addon "$?" "CSS" "${CSS_RELEASE_TAG:-latest}"
+        return $?
+    fi
 
     # Validate JSON response
     if [ -z "$release_info" ] || ! echo "$release_info" | jq -e . >/dev/null 2>&1; then
@@ -28,25 +33,29 @@ update_counterstrikesharp() {
 
     if [ -z "$new_version" ]; then
         log_message "Failed to get version for $REPO" "error"
-        return 0
+        return 1
     fi
 
     # Check if update needed
-    if [ "$current_version" = "$new_version" ]; then
+    if [ "$current_version" = "$new_version" ] && addon_files_present "CSS"; then
         log_message "CSS is up-to-date ($current_version)" "info"
         return 0
     fi
 
     if [ -z "$asset_url" ]; then
         log_message "No suitable asset found for $REPO" "error"
-        return 0
+        return 1
     fi
 
     log_message "Update available for CSS: $new_version (current: ${current_version:-none})" "info"
 
     if handle_download_and_extract "$asset_url" "$temp_dir/download.zip" "$temp_dir" "zip"; then
-        cp -r "$temp_dir/addons/." "$OUTPUT_DIR" && \
-        update_version_file "CSS" "$new_version" && \
+        if ! addon_files_present "CSS" "$temp_dir/addons"; then
+            log_message "CounterStrikeSharp archive has an incomplete runtime" "error"
+            return 1
+        fi
+        cp -r "$temp_dir/addons/." "$OUTPUT_DIR" || return 1
+        update_version_file "CSS" "$new_version" || return 1
         log_message "CounterStrikeSharp updated to $new_version" "success"
         return 0
     fi

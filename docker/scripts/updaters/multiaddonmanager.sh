@@ -12,7 +12,12 @@ update_multiaddonmanager() {
     local release_info new_version asset_url asset_name current_version
     local work_dir archive extracted content_root backup_dir
 
-    release_info="$(get_github_release "$MAM_REPO" "(?i).*(linux|steamrt3).*(\\.zip|\\.tar\\.gz)$" "${MAM_RELEASE_TAG:-}")"
+    if release_info="$(get_github_release "$MAM_REPO" "(?i).*(linux|steamrt3).*(\\.zip|\\.tar\\.gz)$" "${MAM_RELEASE_TAG:-}")"; then
+        :
+    else
+        use_installed_addon "$?" "$MAM_VERSION_KEY" "${MAM_RELEASE_TAG:-latest}"
+        return $?
+    fi
     if [ -z "$release_info" ] || ! echo "$release_info" | jq -e . >/dev/null 2>&1; then
         log_message "Failed to fetch MultiAddonManager release information" "error"
         return 1
@@ -27,7 +32,7 @@ update_multiaddonmanager() {
     fi
 
     current_version="$(get_current_version "$MAM_VERSION_KEY")"
-    if [ "$current_version" = "$new_version" ] && [ -d "$output_dir/addons/multiaddonmanager" ]; then
+    if [ "$current_version" = "$new_version" ] && addon_files_present "$MAM_VERSION_KEY"; then
         log_message "MultiAddonManager is up-to-date ($current_version)" "info"
         return 0
     fi
@@ -66,8 +71,7 @@ update_multiaddonmanager() {
         content_root="$extracted/csgo"
     fi
 
-    if [ ! -d "$content_root/addons/multiaddonmanager" ] || \
-       [ ! -f "$content_root/addons/metamod/multiaddonmanager.vdf" ]; then
+    if ! addon_files_present "$MAM_VERSION_KEY" "$content_root/addons"; then
         log_message "MultiAddonManager archive has an unexpected layout" "error"
         rm -rf "$work_dir"
         return 1
