@@ -4,7 +4,7 @@
 source /utils/logging.sh
 source /utils/updater_common.sh
 
-MAM_REPO="Source2ZE/MultiAddonManager"
+MAM_REPO="NaMol4anke/MultiAddonManager"
 MAM_VERSION_KEY="MultiAddonManager"
 
 update_multiaddonmanager() {
